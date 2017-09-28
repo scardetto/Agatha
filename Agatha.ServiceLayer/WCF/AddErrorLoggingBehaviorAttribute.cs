@@ -4,13 +4,13 @@ using System.ServiceModel;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Description;
 using System.ServiceModel.Dispatcher;
-using Common.Logging;
+using Agatha.ServiceLayer.Logging;
 
 namespace Agatha.ServiceLayer.WCF
 {
 	public class AddErrorLoggingBehaviorAttribute : Attribute, IServiceBehavior, IErrorHandler
 	{
-		private readonly ILog logger = LogManager.GetLogger(typeof(AddErrorLoggingBehaviorAttribute));
+		private readonly ILog logger = LogProvider.GetLogger(typeof(AddErrorLoggingBehaviorAttribute));
 
 		public void Validate(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase) { }
 
@@ -30,7 +30,7 @@ namespace Agatha.ServiceLayer.WCF
 
 		public void ProvideFault(Exception error, MessageVersion version, ref Message fault)
 		{
-			logger.Error(error);
+			logger.ErrorException("An unexpected error occurred", error);
 		}
 
 		public bool HandleError(Exception error)

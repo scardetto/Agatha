@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using Agatha.Common;
 using Agatha.Common.InversionOfControl;
-using Common.Logging;
+using Agatha.ServiceLayer.Logging;
 
 namespace Agatha.ServiceLayer
 {
     public class RequestProcessor : Disposable, IRequestProcessor
     {
         private readonly ServiceLayerConfiguration serviceLayerConfiguration;
-        private readonly ILog logger = LogManager.GetLogger(typeof(RequestProcessor));
+        private readonly ILog logger = LogProvider.GetLogger(typeof(RequestProcessor));
         private readonly IRequestProcessingErrorHandler errorHandler;
 
         protected override void DisposeManagedResources()
@@ -56,7 +56,7 @@ namespace Agatha.ServiceLayer
 
                 IList<IRequestHandlerInterceptor> interceptors = new List<IRequestHandlerInterceptor>();
                 IList<IRequestHandlerInterceptor> invokedInterceptors = new List<IRequestHandlerInterceptor>();
-                
+
                 try
                 {
                     interceptors = ResolveInterceptors();
@@ -74,7 +74,7 @@ namespace Agatha.ServiceLayer
                 }
                 catch (Exception exc)
                 {
-                    logger.Error(exc.Message, exc);
+                    logger.ErrorException(exc.Message, exc);
                     exceptionsPreviouslyOccurred = true;
                     errorHandler.DealWithException(requestProcessingState, exc);
                 }
@@ -88,7 +88,7 @@ namespace Agatha.ServiceLayer
                         {
                             foreach (var exceptionFromInterceptor in possibleExceptionsFromInterceptors)
                             {
-                                logger.Error(exceptionFromInterceptor);
+                                logger.ErrorException("An unexpected error occurred in interceptor", exceptionFromInterceptor);
                             }
                             exceptionsPreviouslyOccurred = true;
                             errorHandler.DealWithException(requestProcessingState, possibleExceptionsFromInterceptors.ElementAt(0));
@@ -100,7 +100,7 @@ namespace Agatha.ServiceLayer
                     }
                 }
             }
-            
+
             var responses = processingContexts.Select(c => c.Response).ToArray();
 
             AfterProcessing(requests, responses);
@@ -183,7 +183,7 @@ namespace Agatha.ServiceLayer
                 }
                 catch (Exception exc)
                 {
-                    logger.Error("error disposing " + interceptor, exc);
+                    logger.ErrorException("error disposing " + interceptor, exc);
                 }
             }
         }
