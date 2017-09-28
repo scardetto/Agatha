@@ -7,7 +7,7 @@ namespace Agatha.Common.InversionOfControl
 		void Register(Type componentType, Type implementationType, Lifestyle lifeStyle);
 	    void Register<TComponent, TImplementation>(Lifestyle lifestyle) where TImplementation : TComponent;
 		void RegisterInstance(Type componentType, object instance);
-		void RegisterInstance<TComponent>(TComponent instance);
+		void RegisterInstance<TComponent>(TComponent instance) where TComponent : class;
 
 		TComponent Resolve<TComponent>();
         TComponent Resolve<TComponent>(string key);
@@ -15,6 +15,6 @@ namespace Agatha.Common.InversionOfControl
         TComponent TryResolve<TComponent>();
 
 		void Release(object component);
-	    
+
 	}
 }
