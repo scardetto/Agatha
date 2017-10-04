@@ -13,7 +13,6 @@ namespace Agatha.Common
 		void Add(params Request[] requestsToAdd);
 		void Add(string key, Request request);
 		void Add<TRequest>(Action<TRequest> action) where TRequest : Request, new();
-		void Send(params OneWayRequest[] oneWayRequests);
 		bool HasResponse<TResponse>() where TResponse : Response;
 		TResponse Get<TResponse>() where TResponse : Response;
 		TResponse Get<TResponse>(string key) where TResponse : Response;
@@ -87,16 +86,9 @@ namespace Agatha.Common
             if (keyToTypes.Keys.Contains(key))
                 throw new InvalidOperationException(
                     String.Format("A request has already been added using the key '{0}'.", key));
-            keyToTypes[key] = request.GetType(); 
+            keyToTypes[key] = request.GetType();
             AddRequest(request, true);
 			keyToResultPositions[key] = requests.Count - 1;
-		}
-
-		public virtual void Send(params OneWayRequest[] oneWayRequests)
-		{
-			BeforeSendingRequests(oneWayRequests);
-			requestProcessor.ProcessOneWayRequests(oneWayRequests);
-			AfterSendingRequests(oneWayRequests);
 		}
 
 		public virtual bool HasResponse<TResponse>() where TResponse : Response
@@ -212,7 +204,7 @@ namespace Agatha.Common
 			}
 		}
 
-		private void PutReceivedResponsesInTempResponseArray(Response[] tempResponseArray, Response[] receivedResponses) 
+		private void PutReceivedResponsesInTempResponseArray(Response[] tempResponseArray, Response[] receivedResponses)
 		{
 			int takeIndex = 0;
 

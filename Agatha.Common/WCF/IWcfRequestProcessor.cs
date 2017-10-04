@@ -1,5 +1,3 @@
-using System;
-using System.ComponentModel;
 using System.ServiceModel;
 
 namespace Agatha.Common.WCF
@@ -11,9 +9,5 @@ namespace Agatha.Common.WCF
 		[ServiceKnownType("GetKnownTypes", typeof(KnownTypeProvider))]
 		[TransactionFlow(TransactionFlowOption.Allowed)]
 		Response[] Process(params Request[] requests);
-
-        [OperationContract(Name = "ProcessOneWayRequests", IsOneWay = true)]
-        [ServiceKnownType("GetKnownTypes", typeof(KnownTypeProvider))]
-		void ProcessOneWayRequests(params OneWayRequest[] requests);
 	}
 }

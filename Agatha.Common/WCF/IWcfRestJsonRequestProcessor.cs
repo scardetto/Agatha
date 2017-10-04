@@ -17,10 +17,5 @@ namespace Agatha.Common.WCF
         [TransactionFlow(TransactionFlowOption.Allowed)]
         [WebInvoke(UriTemplate = "/post", BodyStyle = WebMessageBodyStyle.Wrapped, ResponseFormat = WebMessageFormat.Json)]
         Response[] Process(Request[] requests);
-
-        [OperationContract(Name = "ProcessOneWayJsonRequestsPost", IsOneWay = true)]
-        [ServiceKnownType("GetKnownTypes", typeof(KnownTypeProvider))]
-        [WebInvoke(UriTemplate = "/post/oneway", BodyStyle = WebMessageBodyStyle.Wrapped, ResponseFormat = WebMessageFormat.Json)]
-        void ProcessOneWayRequests(OneWayRequest[] requests);
     }
 }

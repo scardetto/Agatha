@@ -12,10 +12,5 @@ namespace Agatha.Common.WCF
         [TransactionFlow(TransactionFlowOption.Allowed)]
         [WebGet(UriTemplate="/", ResponseFormat = WebMessageFormat.Xml)]
         Response[] Process();
-
-        [OperationContract(Name = "ProcessOneWayXmlRequests", IsOneWay = true)]
-        [ServiceKnownType("GetKnownTypes", typeof(KnownTypeProvider))]
-        [WebGet(UriTemplate="/oneway", ResponseFormat = WebMessageFormat.Xml)]
-        void ProcessOneWayRequests();
     }
 }

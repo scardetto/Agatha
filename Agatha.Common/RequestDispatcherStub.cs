@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -6,20 +5,19 @@ namespace Agatha.Common
 {
 	public class RequestDispatcherStub : RequestDispatcher
 	{
-		private readonly List<OneWayRequest> oneWayRequests = new List<OneWayRequest>();
-		private readonly List<Response> responsesToReturn = new List<Response>();
-		private readonly Dictionary<string, Request> keyToRequest = new Dictionary<string, Request>();
+		private readonly List<Response> _responsesToReturn = new List<Response>();
+		private readonly Dictionary<string, Request> _keyToRequest = new Dictionary<string, Request>();
 
 		public RequestDispatcherStub() : base(null, null) { }
 
 		public void AddResponsesToReturn(params Response[] responses)
 		{
-			responsesToReturn.AddRange(responses);
+			_responsesToReturn.AddRange(responses);
 		}
 
 		public void AddResponsesToReturn(Dictionary<string, Response> keyedResponses)
 		{
-			responsesToReturn.AddRange(keyedResponses.Values);
+			_responsesToReturn.AddRange(keyedResponses.Values);
 
 			for (int i = 0; i < keyedResponses.Keys.Count; i++)
 			{
@@ -34,13 +32,13 @@ namespace Agatha.Common
 
 		public void AddResponseToReturn(Response response)
 		{
-			responsesToReturn.Add(response);
+			_responsesToReturn.Add(response);
 		}
 
 		public void AddResponseToReturn(string key, Response response)
 		{
-			responsesToReturn.Add(response);
-			keyToResultPositions.Add(key, responsesToReturn.Count - 1);
+			_responsesToReturn.Add(response);
+			keyToResultPositions.Add(key, _responsesToReturn.Count - 1);
 		}
 
 		public override void Clear()
@@ -52,53 +50,27 @@ namespace Agatha.Common
 		public override void Add(string key, Request request)
 		{
 			base.Add(key, request);
-			keyToRequest[key] = request;
+			_keyToRequest[key] = request;
 		}
 
 		public TRequest GetRequest<TRequest>() where TRequest : Request
 		{
-			return (TRequest)SentRequests.First(r => r.GetType().Equals(typeof(TRequest)));
+			return (TRequest)SentRequests.First(r => r.GetType() == typeof(TRequest));
 		}
 
 		public TRequest GetRequest<TRequest>(string key) where TRequest : Request
 		{
-			return (TRequest)keyToRequest[key];
+			return (TRequest)_keyToRequest[key];
 		}
 
 		public bool HasRequest<TRequest>() where TRequest : Request
 		{
-			return SentRequests.Any(r => r.GetType().Equals(typeof(TRequest)));
-		}
-
-		public bool HasOneWayRequest<TOneWayRequest>() where TOneWayRequest : OneWayRequest
-		{
-			return oneWayRequests.Any(r => r.GetType() == typeof(TOneWayRequest));
-		}
-
-		public TOneWayRequest GetOneWayRequest<TOneWayRequest>() where TOneWayRequest : OneWayRequest
-		{
-			if (oneWayRequests.Any(r => r.GetType() == typeof(TOneWayRequest)))
-			{
-				throw new InvalidOperationException(string.Format("Multiple OneWayRequests of type {0} have been added, use the GetOneWayRequests method instead to perform your inspection", typeof(TOneWayRequest)));
-			}
-
-			return oneWayRequests.FirstOrDefault(r => r.GetType() == typeof(TOneWayRequest)) as TOneWayRequest;
-		}
-
-		public IEnumerable<OneWayRequest> GetOneWayRequests()
-		{
-			return oneWayRequests;
+			return SentRequests.Any(r => r.GetType() == typeof(TRequest));
 		}
 
 		protected override Response[] GetResponses(Request[] requestsToProcess)
 		{
-			return responsesToReturn.ToArray();
-		}
-
-		public override void Send(params OneWayRequest[] oneWayRequests)
-		{
-			this.oneWayRequests.AddRange(oneWayRequests);
-			base.Send(oneWayRequests);
+			return _responsesToReturn.ToArray();
 		}
 	}
 }

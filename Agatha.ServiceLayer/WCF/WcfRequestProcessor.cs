@@ -23,14 +23,6 @@ namespace Agatha.ServiceLayer.WCF
             }
         }
 
-        public void ProcessOneWayRequests(params OneWayRequest[] requests)
-        {
-            using (var container = GetContainer()) {
-                var processor = container.Resolve<IRequestProcessor>();
-                processor.ProcessOneWayRequests(requests);
-            }
-        }
-
         public Response[] Process()
         {
             var collection = WebOperationContext.Current?.IncomingRequest.UriTemplateMatch.QueryParameters;
@@ -40,17 +32,6 @@ namespace Agatha.ServiceLayer.WCF
             var requests = builder.GetRequests(collection);
 
             return Process(requests);
-        }
-
-        public void ProcessOneWayRequests()
-        {
-            var collection = WebOperationContext.Current?.IncomingRequest.UriTemplateMatch.QueryParameters;
-
-            var builder = new RestRequestBuilder();
-
-            var requests = builder.GetOneWayRequests(collection);
-
-            ProcessOneWayRequests(requests);
         }
 
         private IContainer GetContainer()

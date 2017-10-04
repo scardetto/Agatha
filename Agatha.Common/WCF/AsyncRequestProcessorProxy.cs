@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.ServiceModel;
 using System.ServiceModel.Channels;
 
@@ -21,19 +20,9 @@ namespace Agatha.Common.WCF
 			return Channel.BeginProcessRequests(requests, callback, asyncState);
 		}
 
-		IAsyncResult IAsyncRequestProcessor.BeginProcessOneWayRequests(OneWayRequest[] oneWayRequests, AsyncCallback callback, object asyncState)
-		{
-			return Channel.BeginProcessOneWayRequests(oneWayRequests, callback, asyncState);
-		}
-
 		Response[] IAsyncRequestProcessor.EndProcessRequests(IAsyncResult result)
 		{
 			return Channel.EndProcessRequests(result);
-		}
-
-		void IAsyncRequestProcessor.EndProcessOneWayRequests(IAsyncResult result)
-		{
-			Channel.EndProcessOneWayRequests(result);
 		}
 
 		private IAsyncResult OnBeginProcessRequests(object[] inValues, AsyncCallback callback, object asyncState)
@@ -42,46 +31,22 @@ namespace Agatha.Common.WCF
 			return ((IAsyncRequestProcessor)(this)).BeginProcessRequests(requests, callback, asyncState);
 		}
 
-		private IAsyncResult OnBeginProcessOneWayRequests(object[] inValues, AsyncCallback callback, object asyncState)
-		{
-			var requests = ((OneWayRequest[])(inValues[0]));
-			return ((IAsyncRequestProcessor)(this)).BeginProcessOneWayRequests(requests, callback, asyncState);
-		}
-
 		private object[] OnEndProcessRequests(IAsyncResult result)
 		{
 			Response[] retVal = ((IAsyncRequestProcessor)(this)).EndProcessRequests(result);
 			return new object[] { retVal };
 		}
 
-		private object[] OnEndProcessOneWayRequests(IAsyncResult result)
-		{
-			((IAsyncRequestProcessor)(this)).EndProcessOneWayRequests(result);
-			return new object[0];
-		}
-
-		private void OnProcessRequestsCompleted(object state)
+	    private void OnProcessRequestsCompleted(object state)
 		{
 			var e = ((InvokeAsyncCompletedEventArgs)(state));
 			((Action<ProcessRequestsAsyncCompletedArgs>)(e.UserState)).Invoke(new ProcessRequestsAsyncCompletedArgs(e.Results, e.Error, e.Cancelled, e.UserState));
 		}
 
-		private void OnProcessOneWayRequestsCompleted(object state)
-		{
-			var e = ((InvokeAsyncCompletedEventArgs)(state));
-			((Action<AsyncCompletedEventArgs>)(e.UserState)).Invoke(new ProcessRequestsAsyncCompletedArgs(e.Results, e.Error, e.Cancelled, e.UserState));
-		}
-
-		public void ProcessRequestsAsync(Request[] requests, Action<ProcessRequestsAsyncCompletedArgs> processCompleted)
+	    public void ProcessRequestsAsync(Request[] requests, Action<ProcessRequestsAsyncCompletedArgs> processCompleted)
 		{
 			InvokeAsync(OnBeginProcessRequests, new object[] { requests },
 				OnEndProcessRequests, OnProcessRequestsCompleted, processCompleted);
-		}
-
-		public void ProcessOneWayRequestsAsync(OneWayRequest[] oneWayRequests, Action<AsyncCompletedEventArgs> processCompleted)
-		{
-			InvokeAsync(OnBeginProcessOneWayRequests, new object[] {oneWayRequests}, 
-				OnEndProcessOneWayRequests, OnProcessOneWayRequestsCompleted, processCompleted);
 		}
 
 		private IAsyncResult OnBeginOpen(object[] inValues, AsyncCallback callback, object asyncState)

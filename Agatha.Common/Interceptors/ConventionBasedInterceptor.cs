@@ -8,7 +8,7 @@ namespace Agatha.Common.Interceptors
         public abstract void BeforeHandlingRequest(RequestProcessingContext context);
         public abstract void AfterHandlingRequest(RequestProcessingContext context);
 
-        protected IConventions Conventions { get; private set; }
+        protected IConventions Conventions { get; }
 
         protected ConventionBasedInterceptor(IContainer container)
         {

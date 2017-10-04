@@ -31,11 +31,6 @@ namespace Agatha.Common.WCF
             return Channel.Process(requests);
         }
 
-        public void ProcessOneWayRequests(params OneWayRequest[] requests)
-        {
-            Channel.ProcessOneWayRequests(requests);
-        }
-
         public void Dispose()
         {
             try

@@ -1,37 +1,27 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Collections.Specialized;
 using Agatha.Common;
 using Agatha.Common.WCF;
 using System.Collections.ObjectModel;
-using System.Text.RegularExpressions;
 
 namespace Agatha.ServiceLayer.WCF.Rest
 {
     public class RestRequestBuilder
     {
-        private readonly RestRequestValidator requestValidator;
+        private readonly RestRequestValidator _requestValidator;
 
-        public RestRequestValidator RequestValidator
-        {
-            get { return requestValidator; }
-        }
+        public RestRequestValidator RequestValidator => _requestValidator;
 
         public RestRequestBuilder()
         {
-            requestValidator = new RestRequestValidator();
+            _requestValidator = new RestRequestValidator();
         }
 
         public Request[] GetRequests(NameValueCollection collection)
         {
             return GetRequests<Request>(collection);
-        }
-
-        public OneWayRequest[] GetOneWayRequests(NameValueCollection collection)
-        {
-            return GetRequests<OneWayRequest>(collection);
         }
 
         protected T[] GetRequests<T>(NameValueCollection collection)
@@ -42,7 +32,7 @@ namespace Agatha.ServiceLayer.WCF.Rest
 
             if (IsSingleRequestCollection(collection))
             {
-                var type = KnownTypeProvider.GetKnownTypes(null).Where(x => x.Name == collection.Get("request")).FirstOrDefault();
+                var type = KnownTypeProvider.GetKnownTypes(null).FirstOrDefault(x => x.Name == collection.Get("request"));
 
                 if (type == null)
                     throw new InvalidOperationException("Cannot resolve the name of the Request Type");
@@ -123,23 +113,23 @@ namespace Agatha.ServiceLayer.WCF.Rest
 
         protected void ValidateCollection(NameValueCollection collection)
         {
-            if (!requestValidator.HasSpecifiedRequestKey(collection))
+            if (!_requestValidator.HasSpecifiedRequestKey(collection))
                 throw new InvalidOperationException("At least one request type must be specified");
 
-            if (!requestValidator.HasValidRequestKeys(collection))
+            if (!_requestValidator.HasValidRequestKeys(collection))
                 throw new InvalidOperationException("An invalid request key has been specified.");
 
-            if (requestValidator.HasDuplicateRequestTypes(collection))
+            if (_requestValidator.HasDuplicateRequestTypes(collection))
                 throw new InvalidOperationException("The name of the request type must be valid, and an index must be unique");
 
-            if (!requestValidator.ValidRequestIndexing(collection))
+            if (!_requestValidator.ValidRequestIndexing(collection))
                 throw new InvalidOperationException("Cannot mix indexed requests with non indexed requests");
         }
 
         protected bool IsSingleRequestCollection(NameValueCollection collection)
         {
-            return collection.AllKeys.Where(x => x == "request").Count() == 1 &&
-                !collection.AllKeys.Any(x => x.IndexOf("[") != -1);
+            return collection.AllKeys.Count(x => x == "request") == 1 &&
+                collection.AllKeys.All(x => x.IndexOf("[") == -1);
         }
 
         protected int[] GetIndexes(NameValueCollection collection)

@@ -100,15 +100,9 @@ namespace Agatha.ServiceLayer
         private void HandleRequest(RequestProcessingContext requestProcessingState)
         {
             var request = requestProcessingState.Request;
-
-            if (request is OneWayRequest wayRequest) {
-                var handler = (IOneWayRequestHandler)_container.Resolve(GetOneWayRequestHandlerTypeFor(request));
-                ExecuteHandler(wayRequest, handler);
-            } else {
-                var handler = (IRequestHandler) _container.Resolve(GetRequestHandlerTypeFor(request));
-                var response = GetResponseFromHandler(request, handler);
-                requestProcessingState.MarkAsProcessed(response);
-            }
+            var handler = (IRequestHandler) _container.Resolve(GetRequestHandlerTypeFor(request));
+            var response = GetResponseFromHandler(request, handler);
+            requestProcessingState.MarkAsProcessed(response);
         }
 
         private IList<Exception> RunInvokedInterceptorsSafely(RequestProcessingContext requestProcessingState, IList<IRequestHandlerInterceptor> invokedInterceptors)
@@ -150,25 +144,5 @@ namespace Agatha.ServiceLayer
         }
 
         protected virtual void OnHandlerException(Request request, Exception exception) { }
-
-        public void ProcessOneWayRequests(params OneWayRequest[] requests)
-        {
-            Process(requests);
-        }
-
-        private static Type GetOneWayRequestHandlerTypeFor(Request request)
-        {
-            return typeof(IOneWayRequestHandler<>).MakeGenericType(request.GetType());
-        }
-
-        private void ExecuteHandler(OneWayRequest request, IOneWayRequestHandler handler)
-        {
-            try {
-                handler.Handle(request);
-            } catch (Exception e) {
-                OnHandlerException(request, e);
-                throw;
-            }
-        }
     }
 }

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using Agatha.Common.Caching;
@@ -16,13 +15,9 @@ namespace Agatha.Common
         void Add<TRequest>(Action<TRequest> action) where TRequest : Request, new();
         void Add(params Request[] requestsToAdd);
         void Add(string key, Request request);
-        void Add(params OneWayRequest[] oneWayRequests);
-        void ProcessOneWayRequests();
         void ProcessRequests(Action<ReceivedResponses> receivedResponsesDelegate, Action<ExceptionInfo> exceptionOccurredDelegate);
         void ProcessRequests(Action<ReceivedResponses> receivedResponsesDelegate, Action<ExceptionInfo, ExceptionType> exceptionAndTypeOccurredDelegate);
     }
-
-    // TODO: make sure that OneWayRequests can't be added through the Add methods
 
     public class AsyncRequestDispatcher : Disposable, IAsyncRequestDispatcher
     {
@@ -31,11 +26,8 @@ namespace Agatha.Common
         protected Dictionary<string, int> KeyToResultPositions;
         private Dictionary<string, Type> _keyToTypes;
 
-        private bool _oneWayRequestsAdded;
-        private bool _twoWayRequestsAdded;
 
         private List<Request> _queuedRequests;
-        private List<OneWayRequest> _queuedOneWayRequests;
 
         public AsyncRequestDispatcher(IAsyncRequestProcessor requestProcessor, ICacheManager cacheManager)
         {
@@ -71,31 +63,6 @@ namespace Agatha.Common
         public virtual void Add(Request request)
         {
             AddRequest(request, false);
-        }
-
-        public virtual void Add(params OneWayRequest[] oneWayRequests)
-        {
-            EnsureWeOnlyHaveOneWayRequests();
-            _queuedOneWayRequests.AddRange(oneWayRequests);
-        }
-
-        public virtual void ProcessOneWayRequests()
-        {
-            var requests = _queuedOneWayRequests.ToArray();
-            BeforeSendingRequests(requests);
-            _requestProcessor.ProcessOneWayRequestsAsync(requests, OnProcessOneWayRequestsCompleted);
-            AfterSendingRequests(requests);
-            _queuedOneWayRequests.Clear();
-        }
-
-        private void OnProcessOneWayRequestsCompleted(AsyncCompletedEventArgs args)
-        {
-            Dispose();
-
-            if (args.Error != null)
-            {
-                throw new InvalidOperationException("Exception occurred during processing of one-way requests", args.Error);
-            }
         }
 
         public virtual void ProcessRequests(Action<ReceivedResponses> receivedResponsesDelegate, Action<ExceptionInfo> exceptionOccurredDelegate)
@@ -170,8 +137,6 @@ namespace Agatha.Common
 
         private void AddRequest(Request request, bool wasAddedWithKey)
         {
-            EnsureWeOnlyHaveTwoWayRequests();
-
             Type requestType = request.GetType();
 
             if (RequestTypeIsAlreadyPresent(requestType) &&
@@ -187,7 +152,7 @@ namespace Agatha.Common
 
         private bool RequestTypeIsAlreadyPresent(Type requestType)
         {
-            return QueuedRequests.Any(r => r.GetType().Equals(requestType));
+            return QueuedRequests.Any(r => r.GetType() == requestType);
         }
 
         private bool RequestTypeIsNotAssociatedWithKey(Type requestType)
@@ -198,34 +163,8 @@ namespace Agatha.Common
         private void InitializeState()
         {
             _queuedRequests = new List<Request>();
-            _queuedOneWayRequests = new List<OneWayRequest>();
             _keyToTypes = new Dictionary<string, Type>();
             KeyToResultPositions = new Dictionary<string, int>();
-        }
-
-        private void EnsureWeOnlyHaveOneWayRequests()
-        {
-            if (_twoWayRequestsAdded)
-            {
-                ThrowInvalidUsageException();
-            }
-
-            _oneWayRequestsAdded = true;
-        }
-
-        private void EnsureWeOnlyHaveTwoWayRequests()
-        {
-            if (_oneWayRequestsAdded)
-            {
-                ThrowInvalidUsageException();
-            }
-
-            _twoWayRequestsAdded = true;
-        }
-
-        private void ThrowInvalidUsageException()
-        {
-            throw new InvalidOperationException("You cannot combine one-way and two-way requests in the same AsyncRequestDispatcher.");
         }
     }
 }
