@@ -71,7 +71,6 @@ namespace Agatha.ServiceLayer
         private void SetDefaultImplementations()
         {
             RequestProcessorImplementation = typeof(RequestProcessor);
-            AsyncRequestProcessorImplementation = typeof(AsyncRequestProcessor);
             CacheManagerImplementation = typeof(CacheManager);
             CacheProviderImplementation = typeof(InMemoryCacheProvider);
             RequestTypeRegistry = new WcfKnownTypesBasedRequestTypeRegistry();
@@ -90,7 +89,6 @@ namespace Agatha.ServiceLayer
             IoC.Container.RegisterInstance(RequestTypeRegistry);
             IoC.Container.RegisterInstance(RequestHandlerRegistry);
             IoC.Container.Register(typeof(IRequestProcessor), RequestProcessorImplementation, Lifestyle.Transient);
-            IoC.Container.Register(typeof(IAsyncRequestProcessor), AsyncRequestProcessorImplementation, Lifestyle.Transient);
             IoC.Container.Register(typeof(ICacheProvider), CacheProviderImplementation, Lifestyle.Singleton);
             IoC.Container.Register(typeof(ICacheManager), CacheManagerImplementation, Lifestyle.Singleton);
             IoC.Container.Register<ITimerProvider, TimerProvider>(Lifestyle.Singleton);

@@ -34,10 +34,6 @@ namespace Agatha.StructureMap
             if (implementationType == typeof(RequestProcessorProxy)) {
                 _container.Configure(x => x.ForConcreteType<RequestProcessorProxy>().Configure.SelectConstructor(() => new RequestProcessorProxy()));
             }
-
-            if (implementationType == typeof(AsyncRequestProcessorProxy)) {
-                _container.Configure(x => x.ForConcreteType<AsyncRequestProcessorProxy>().Configure.SelectConstructor(() => new AsyncRequestProcessorProxy()));
-            }
         }
 
         public void Register<TComponent, TImplementation>(Lifestyle lifestyle) where TImplementation : TComponent

@@ -11,8 +11,8 @@ namespace Agatha.Common
 {
 	public class ClientConfiguration
 	{
-		private readonly List<Assembly> requestsAndResponseAssemblies = new List<Assembly>();
-		private readonly IContainer container;
+		private readonly List<Assembly> _requestsAndResponseAssemblies = new List<Assembly>();
+		private readonly IContainer _container;
 
 		public Type RequestDispatcherImplementation { get; set; }
 		public Type RequestDispatcherFactoryImplementation { get; set; }
@@ -20,13 +20,13 @@ namespace Agatha.Common
 		public Type AsyncRequestDispatcherImplementation { get; set; }
 		public Type AsyncRequestDispatcherFactoryImplementation { get; set; }
 		public Type AsyncRequestProcessorImplementation { get; set; }
-		public Type ContainerImplementation { get; private set; }
+		public Type ContainerImplementation { get; }
 		public Type CacheProviderImplementation { get; set; }
 		public Type CacheManagerImplementation { get; set; }
 
 		public ClientConfiguration(IContainer container)
 		{
-			this.container = container;
+			_container = container;
 			SetDefaultImplementations();
 		}
 
@@ -50,7 +50,7 @@ namespace Agatha.Common
 
 		public ClientConfiguration AddRequestAndResponseAssembly(Assembly assembly)
 		{
-			requestsAndResponseAssemblies.Add(assembly);
+			_requestsAndResponseAssemblies.Add(assembly);
 			return this;
 		}
 
@@ -59,9 +59,6 @@ namespace Agatha.Common
 			RequestDispatcherImplementation = typeof(RequestDispatcher);
 			RequestDispatcherFactoryImplementation = typeof(RequestDispatcherFactory);
 			RequestProcessorImplementation = typeof(RequestProcessorProxy);
-			AsyncRequestDispatcherImplementation = typeof(AsyncRequestDispatcher);
-			AsyncRequestDispatcherFactoryImplementation = typeof(AsyncRequestDispatcherFactory);
-			AsyncRequestProcessorImplementation = typeof(AsyncRequestProcessorProxy);
 			CacheManagerImplementation = typeof(CacheManager);
 			CacheProviderImplementation = typeof(InMemoryCacheProvider);
 		}
@@ -70,15 +67,12 @@ namespace Agatha.Common
 		{
 			if (IoC.Container == null)
 			{
-				IoC.Container = container ?? (IContainer)Activator.CreateInstance(ContainerImplementation);
+				IoC.Container = _container ?? (IContainer)Activator.CreateInstance(ContainerImplementation);
 			}
 
 			IoC.Container.Register(typeof(IRequestProcessor), RequestProcessorImplementation, Lifestyle.Transient);
 			IoC.Container.Register(typeof(IRequestDispatcher), RequestDispatcherImplementation, Lifestyle.Transient);
 			IoC.Container.Register(typeof(IRequestDispatcherFactory), RequestDispatcherFactoryImplementation, Lifestyle.Singleton);
-			IoC.Container.Register(typeof(IAsyncRequestProcessor), AsyncRequestProcessorImplementation, Lifestyle.Transient);
-			IoC.Container.Register(typeof(IAsyncRequestDispatcher), AsyncRequestDispatcherImplementation, Lifestyle.Transient);
-			IoC.Container.Register(typeof(IAsyncRequestDispatcherFactory), AsyncRequestDispatcherFactoryImplementation, Lifestyle.Singleton);
 			IoC.Container.Register(typeof(ICacheProvider), CacheProviderImplementation, Lifestyle.Singleton);
 			IoC.Container.Register(typeof(ICacheManager), CacheManagerImplementation, Lifestyle.Singleton);
 			IoC.Container.Register<ITimerProvider, TimerProvider>(Lifestyle.Singleton);
@@ -88,14 +82,14 @@ namespace Agatha.Common
 
 		private void ConfigureCachingLayer()
 		{
-			var requestTypes = requestsAndResponseAssemblies.SelectMany(a => a.GetTypes()).Where(t => !t.IsAbstract && t.IsSubclassOf(typeof(Request)));
+			var requestTypes = _requestsAndResponseAssemblies.SelectMany(a => a.GetTypes()).Where(t => !t.IsAbstract && t.IsSubclassOf(typeof(Request)));
 			var cacheConfiguration = new ClientCacheConfiguration(requestTypes);
 			IoC.Container.RegisterInstance<CacheConfiguration>(cacheConfiguration);
 		}
 
 		private void RegisterRequestAndResponseTypes()
 		{
-			foreach (var assembly in requestsAndResponseAssemblies)
+			foreach (var assembly in _requestsAndResponseAssemblies)
 			{
 				KnownTypeProvider.RegisterDerivedTypesOf<Request>(assembly);
 				KnownTypeProvider.RegisterDerivedTypesOf<Response>(assembly);
