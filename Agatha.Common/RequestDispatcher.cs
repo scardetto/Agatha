@@ -1,287 +1,306 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Agatha.Common.Caching;
 
 namespace Agatha.Common
 {
-	public interface IRequestDispatcher : IDisposable
-	{
-		IEnumerable<Response> Responses { get; }
+    public interface IRequestDispatcher : IDisposable
+    {
+        void Add(Request request);
+        void Add(params Request[] requestsToAdd);
+        void Add(string key, Request request);
+        void Add<TRequest>(Action<TRequest> action) where TRequest : Request, new();
 
-		void Add(Request request);
-		void Add(params Request[] requestsToAdd);
-		void Add(string key, Request request);
-		void Add<TRequest>(Action<TRequest> action) where TRequest : Request, new();
-		bool HasResponse<TResponse>() where TResponse : Response;
-		TResponse Get<TResponse>() where TResponse : Response;
-		TResponse Get<TResponse>(string key) where TResponse : Response;
-		TResponse Get<TResponse>(Request request) where TResponse : Response;
-		void Clear();
-	}
+        Task<IEnumerable<Response>> GetResponses();
+        Task<bool> HasResponse<TResponse>() where TResponse : Response;
+        Task<TResponse> GetAsync<TResponse>() where TResponse : Response;
+        Task<TResponse> GetAsync<TResponse>(string key) where TResponse : Response;
+        Task<TResponse> GetAsync<TResponse>(Request request) where TResponse : Response;
 
-	// TODO: make sure that OneWayRequests can't be added through the Add methods
+        TResponse Get<TResponse>() where TResponse : Response;
+        TResponse Get<TResponse>(string key) where TResponse : Response;
+        TResponse Get<TResponse>(Request request) where TResponse : Response;
 
-	public class RequestDispatcher : Disposable, IRequestDispatcher
-	{
-		private readonly IRequestProcessor requestProcessor;
-		private readonly ICacheManager cacheManager;
+        void Clear();
+    }
 
-		private Dictionary<string, Type> keyToTypes;
-		protected Dictionary<string, int> keyToResultPositions;
-		private List<Request> requests;
-		private Response[] responses;
+    public class RequestDispatcher : Disposable, IRequestDispatcher
+    {
+        private readonly IRequestProcessor _requestProcessor;
+        private readonly ICacheManager _cacheManager;
 
-		public RequestDispatcher(IRequestProcessor requestProcessor, ICacheManager cacheManager)
-		{
-			this.requestProcessor = requestProcessor;
-			this.cacheManager = cacheManager;
-			InitializeState();
-		}
+        private Dictionary<string, Type> _keyToTypes;
+        private List<Request> _requests;
+        private Response[] _responses;
 
-		private void InitializeState()
-		{
-			requests = new List<Request>();
-			responses = null;
-			keyToTypes = new Dictionary<string, Type>();
-			keyToResultPositions = new Dictionary<string, int>();
-		}
+        protected Dictionary<string, int> KeyToResultPositions;
 
-		public IEnumerable<Request> SentRequests
-		{
-			get { return requests; }
-		}
+        public RequestDispatcher(IRequestProcessor requestProcessor, ICacheManager cacheManager)
+        {
+            _requestProcessor = requestProcessor;
+            _cacheManager = cacheManager;
+            InitializeState();
+        }
 
-		public IEnumerable<Response> Responses
-		{
-			get
-			{
-				SendRequestsIfNecessary();
-				return responses;
-			}
-		}
+        private void InitializeState()
+        {
+            _requests = new List<Request>();
+            _responses = null;
+            _keyToTypes = new Dictionary<string, Type>();
+            KeyToResultPositions = new Dictionary<string, int>();
+        }
 
-		public virtual void Add(params Request[] requestsToAdd)
-		{
-			foreach (var request in requestsToAdd)
-			{
-				Add(request);
-			}
-		}
+        public IEnumerable<Request> SentRequests => _requests;
 
-		public virtual void Add<TRequest>(Action<TRequest> action) where TRequest : Request, new()
-		{
-			var request = new TRequest();
-			action(request);
-			Add(request);
-		}
+        public async Task<IEnumerable<Response>> GetResponses()
+        {
+            await SendRequestsIfNecessary();
+            return _responses;
+        }
 
-		public virtual void Add(Request request)
-		{
-			AddRequest(request, false);
-		}
+        public virtual void Add(params Request[] requestsToAdd)
+        {
+            foreach (var request in requestsToAdd)
+            {
+                Add(request);
+            }
+        }
 
-		public virtual void Add(string key, Request request)
-		{
-            if (keyToTypes.Keys.Contains(key))
+        public virtual void Add<TRequest>(Action<TRequest> action) where TRequest : Request, new()
+        {
+            var request = new TRequest();
+            action(request);
+            Add(request);
+        }
+
+        public virtual void Add(Request request)
+        {
+            AddRequest(request, false);
+        }
+
+        public virtual void Add(string key, Request request)
+        {
+            if (_keyToTypes.Keys.Contains(key))
                 throw new InvalidOperationException(
-                    String.Format("A request has already been added using the key '{0}'.", key));
-            keyToTypes[key] = request.GetType();
+                    $"A request has already been added using the key '{key}'.");
+            _keyToTypes[key] = request.GetType();
             AddRequest(request, true);
-			keyToResultPositions[key] = requests.Count - 1;
-		}
+            KeyToResultPositions[key] = _requests.Count - 1;
+        }
 
-		public virtual bool HasResponse<TResponse>() where TResponse : Response
-		{
-			SendRequestsIfNecessary();
-			return responses.OfType<TResponse>().Any();
-		}
+        public virtual async Task<bool> HasResponse<TResponse>() where TResponse : Response
+        {
+            await SendRequestsIfNecessary();
+            return _responses.OfType<TResponse>().Any();
+        }
 
-		private bool HasResponse(string key)
-		{
-			SendRequestsIfNecessary();
-			return keyToResultPositions.ContainsKey(key);
-		}
+        private async Task<bool> HasResponse(string key)
+        {
+            await SendRequestsIfNecessary();
+            return KeyToResultPositions.ContainsKey(key);
+        }
 
-		private bool HasMoreThanOneResponse<TResponse>() where TResponse : Response
-		{
-			SendRequestsIfNecessary();
-			return responses.OfType<TResponse>().Count() > 1;
-		}
+        private async Task<bool> HasMoreThanOneResponse<TResponse>() where TResponse : Response
+        {
+            await SendRequestsIfNecessary();
+            return _responses.OfType<TResponse>().Count() > 1;
+        }
 
-		public virtual TResponse Get<TResponse>() where TResponse : Response
-		{
-			SendRequestsIfNecessary();
-			if (!HasResponse<TResponse>())
-			{
-				throw new InvalidOperationException(String.Format("There is no response with type {0}. Maybe you called Clear before or forgot to add appropriate request first.", typeof(TResponse).FullName));
-			}
+        public virtual async Task<TResponse> GetAsync<TResponse>() where TResponse : Response
+        {
+            await SendRequestsIfNecessary();
 
-			if (HasMoreThanOneResponse<TResponse>())
-			{
-				throw new InvalidOperationException(String.Format("There is more than one response with type {0}. If two request handlers return responses with the same type, you need to add requests using Add(string key, Request request).", typeof(TResponse).FullName));
-			}
+            if (!await HasResponse<TResponse>())
+            {
+                throw new InvalidOperationException(
+                    $"There is no response with type {typeof(TResponse).FullName}. Maybe you called Clear before or forgot to add appropriate request first.");
+            }
 
-			return responses.OfType<TResponse>().Single();
-		}
+            if (await HasMoreThanOneResponse<TResponse>())
+            {
+                throw new InvalidOperationException(
+                    $"There is more than one response with type {typeof(TResponse).FullName}. If two request handlers return responses with the same type, you need to add requests using Add(string key, Request request).");
+            }
 
-		public virtual TResponse Get<TResponse>(string key) where TResponse : Response
-		{
-			SendRequestsIfNecessary();
-			if (!HasResponse(key))
-			{
-				throw new InvalidOperationException(String.Format("There is no response with key '{0}'. Maybe you called Clear before or forgot to add appropriate request first.", key));
-			}
+            return _responses.OfType<TResponse>().Single();
+        }
 
-			return (TResponse)responses[keyToResultPositions[key]];
-		}
+        public virtual async Task<TResponse> GetAsync<TResponse>(string key) where TResponse : Response
+        {
+            await SendRequestsIfNecessary();
+            if (!await HasResponse(key))
+            {
+                throw new InvalidOperationException(
+                    $"There is no response with key '{key}'. Maybe you called Clear before or forgot to add appropriate request first.");
+            }
 
-		public virtual TResponse Get<TResponse>(Request request) where TResponse : Response
-		{
-			Add(request);
-			return Get<TResponse>();
-		}
+            return (TResponse)_responses[KeyToResultPositions[key]];
+        }
 
-		public virtual void Clear()
-		{
-			InitializeState();
-		}
+        public virtual async Task<TResponse> GetAsync<TResponse>(Request request) where TResponse : Response
+        {
+            Add(request);
+            return await GetAsync<TResponse>();
+        }
 
-		protected override void DisposeManagedResources()
-		{
-			if (requestProcessor != null) requestProcessor.Dispose();
-		}
+        public TResponse Get<TResponse>() where TResponse : Response
+        {
+            return GetAsync<TResponse>().GetAwaiter().GetResult();
+        }
 
-		protected virtual Response[] GetResponses(params Request[] requestsToProcess)
-		{
-			BeforeSendingRequests(requestsToProcess);
+        public TResponse Get<TResponse>(string key) where TResponse : Response
+        {
+            return GetAsync<TResponse>(key).GetAwaiter().GetResult();
+        }
 
-			var tempResponseArray = new Response[requestsToProcess.Length];
-			var requestsToSend = new List<Request>(requestsToProcess);
+        public TResponse Get<TResponse>(Request request) where TResponse : Response
+        {
+            return GetAsync<TResponse>(request).GetAwaiter().GetResult();
+        }
 
-			GetCachedResponsesAndRemoveThoseRequests(requestsToProcess, tempResponseArray, requestsToSend);
-			var requestsToSendAsArray = requestsToSend.ToArray();
+        public virtual void Clear()
+        {
+            InitializeState();
+        }
 
-			if (requestsToSend.Count > 0)
-			{
-				var receivedResponses = requestProcessor.Process(requestsToSendAsArray);
-				AddCacheableResponsesToCache(receivedResponses, requestsToSendAsArray);
-				PutReceivedResponsesInTempResponseArray(tempResponseArray, receivedResponses);
-			}
+        protected override void DisposeManagedResources()
+        {
+            _requestProcessor?.Dispose();
+        }
 
-			AfterSendingRequests(requestsToProcess);
-			BeforeReturningResponses(tempResponseArray);
-			return tempResponseArray;
-		}
+        protected virtual async Task<Response[]> GetResponses(params Request[] requestsToProcess)
+        {
+            BeforeSendingRequests(requestsToProcess);
 
-		private void GetCachedResponsesAndRemoveThoseRequests(Request[] requestsToProcess, Response[] tempResponseArray, List<Request> requestsToSend)
-		{
-			for (int i = 0; i < requestsToProcess.Length; i++)
-			{
-				var request = requestsToProcess[i];
+            var tempResponseArray = new Response[requestsToProcess.Length];
+            var requestsToSend = new List<Request>(requestsToProcess);
 
-				if (cacheManager.IsCachingEnabledFor(request.GetType()))
-				{
-					var cachedResponse = cacheManager.GetCachedResponseFor(request);
+            GetCachedResponsesAndRemoveThoseRequests(requestsToProcess, tempResponseArray, requestsToSend);
+            var requestsToSendAsArray = requestsToSend.ToArray();
 
-					if (cachedResponse != null)
-					{
-						tempResponseArray[i] = cachedResponse;
-						requestsToSend.Remove(request);
-					}
-				}
-			}
-		}
+            if (requestsToSend.Count > 0)
+            {
+                var receivedResponses = await _requestProcessor.ProcessAsync(requestsToSendAsArray);
+                AddCacheableResponsesToCache(receivedResponses, requestsToSendAsArray);
+                PutReceivedResponsesInTempResponseArray(tempResponseArray, receivedResponses);
+            }
 
-		private void AddCacheableResponsesToCache(Response[] receivedResponses, Request[] requestsToSend)
-		{
-			for (int i = 0; i < receivedResponses.Length; i++)
-			{
-				if (receivedResponses[i].ExceptionType == ExceptionType.None && cacheManager.IsCachingEnabledFor(requestsToSend[i].GetType()))
-				{
-					cacheManager.StoreInCache(requestsToSend[i], receivedResponses[i]);
-				}
-			}
-		}
+            AfterSendingRequests(requestsToProcess);
+            BeforeReturningResponses(tempResponseArray);
+            return tempResponseArray;
+        }
 
-		private void PutReceivedResponsesInTempResponseArray(Response[] tempResponseArray, Response[] receivedResponses)
-		{
-			int takeIndex = 0;
+        private void GetCachedResponsesAndRemoveThoseRequests(Request[] requestsToProcess, Response[] tempResponseArray, List<Request> requestsToSend)
+        {
+            for (int i = 0; i < requestsToProcess.Length; i++)
+            {
+                var request = requestsToProcess[i];
 
-			for (int i = 0; i < tempResponseArray.Length; i++)
-			{
-				if (tempResponseArray[i] == null)
-				{
-					tempResponseArray[i] = receivedResponses[takeIndex++];
-				}
-			}
-		}
+                if (_cacheManager.IsCachingEnabledFor(request.GetType()))
+                {
+                    var cachedResponse = _cacheManager.GetCachedResponseFor(request);
 
-		protected virtual void BeforeSendingRequests(IEnumerable<Request> requestsToProcess) {}
-		protected virtual void AfterSendingRequests(IEnumerable<Request> sentRequests) {}
-		protected virtual void BeforeReturningResponses(IEnumerable<Response> receivedResponses) {}
+                    if (cachedResponse != null)
+                    {
+                        tempResponseArray[i] = cachedResponse;
+                        requestsToSend.Remove(request);
+                    }
+                }
+            }
+        }
 
-		private void SendRequestsIfNecessary()
-		{
-			if (!RequestsSent())
-			{
-				responses = GetResponses(requests.ToArray());
-				DealWithPossibleExceptions(responses);
-			}
-		}
+        private void AddCacheableResponsesToCache(Response[] receivedResponses, Request[] requestsToSend)
+        {
+            for (int i = 0; i < receivedResponses.Length; i++)
+            {
+                if (receivedResponses[i].ExceptionType == ExceptionType.None && _cacheManager.IsCachingEnabledFor(requestsToSend[i].GetType()))
+                {
+                    _cacheManager.StoreInCache(requestsToSend[i], receivedResponses[i]);
+                }
+            }
+        }
 
-		private bool RequestsSent()
-		{
-			return responses != null;
-		}
+        private void PutReceivedResponsesInTempResponseArray(Response[] tempResponseArray, Response[] receivedResponses)
+        {
+            int takeIndex = 0;
 
-		private void DealWithPossibleExceptions(IEnumerable<Response> responsesToCheck)
-		{
-			foreach (var response in responsesToCheck)
-			{
-				if (response.ExceptionType == ExceptionType.Security)
-				{
-					DealWithSecurityException(response.Exception);
-				}
+            for (int i = 0; i < tempResponseArray.Length; i++)
+            {
+                if (tempResponseArray[i] == null)
+                {
+                    tempResponseArray[i] = receivedResponses[takeIndex++];
+                }
+            }
+        }
 
-				if (response.ExceptionType == ExceptionType.Unknown)
-				{
-					DealWithUnknownException(response.Exception);
-				}
-			}
-		}
+        protected virtual void BeforeSendingRequests(IEnumerable<Request> requestsToProcess) {}
+        protected virtual void AfterSendingRequests(IEnumerable<Request> sentRequests) {}
+        protected virtual void BeforeReturningResponses(IEnumerable<Response> receivedResponses) {}
 
-		protected virtual void DealWithUnknownException(ExceptionInfo exception) { }
+        private async Task SendRequestsIfNecessary()
+        {
+            if (!RequestsSent())
+            {
+                _responses = await GetResponses(_requests.ToArray());
+                DealWithPossibleExceptions(_responses);
+            }
+        }
 
-		protected virtual void DealWithSecurityException(ExceptionInfo exceptionDetail) { }
+        private bool RequestsSent()
+        {
+            return _responses != null;
+        }
 
-		private void AddRequest(Request request, bool wasAddedWithKey)
-		{
-			if (RequestsSent())
-			{
-				throw new InvalidOperationException("Requests where already send. Either add request earlier or call Clear.");
-			}
+        private void DealWithPossibleExceptions(IEnumerable<Response> responsesToCheck)
+        {
+            foreach (var response in responsesToCheck)
+            {
+                if (response.ExceptionType == ExceptionType.Security)
+                {
+                    DealWithSecurityException(response.Exception);
+                }
 
-			Type requestType = request.GetType();
+                if (response.ExceptionType == ExceptionType.Unknown)
+                {
+                    DealWithUnknownException(response.Exception);
+                }
+            }
+        }
 
-			if (RequestTypeIsAlreadyPresent(requestType) &&
-				(RequestTypeIsNotAssociatedWithKey(requestType) || !wasAddedWithKey))
-			{
-				throw new InvalidOperationException(String.Format("A request of type {0} has already been added. "
-																  + "Please add requests of the same type with a different key.", requestType.FullName));
-			}
+        protected virtual void DealWithUnknownException(ExceptionInfo exception) { }
 
-			requests.Add(request);
-		}
+        protected virtual void DealWithSecurityException(ExceptionInfo exceptionDetail) { }
 
-		private bool RequestTypeIsNotAssociatedWithKey(Type requestType)
-		{
-			return !keyToTypes.Values.Contains(requestType);
-		}
+        private void AddRequest(Request request, bool wasAddedWithKey)
+        {
+            if (RequestsSent())
+            {
+                throw new InvalidOperationException("Requests where already send. Either add request earlier or call Clear.");
+            }
 
-		private bool RequestTypeIsAlreadyPresent(Type requestType)
-		{
-			return requests.Any(r => r.GetType().Equals(requestType));
-		}
-	}
+            Type requestType = request.GetType();
+
+            if (RequestTypeIsAlreadyPresent(requestType) &&
+                (RequestTypeIsNotAssociatedWithKey(requestType) || !wasAddedWithKey))
+            {
+                throw new InvalidOperationException(
+                    $"A request of type {requestType.FullName} has already been added. " +
+                    "Please add requests of the same type with a different key.");
+            }
+
+            _requests.Add(request);
+        }
+
+        private bool RequestTypeIsNotAssociatedWithKey(Type requestType)
+        {
+            return !_keyToTypes.Values.Contains(requestType);
+        }
+
+        private bool RequestTypeIsAlreadyPresent(Type requestType)
+        {
+            return _requests.Any(r => r.GetType() == requestType);
+        }
+    }
 }

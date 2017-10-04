@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Agatha.Common
 {
@@ -25,7 +26,7 @@ namespace Agatha.Common
 
 				if (key != null)
 				{
-					keyToResultPositions.Add(key, i);
+					KeyToResultPositions.Add(key, i);
 				}
 			}
 		}
@@ -38,7 +39,7 @@ namespace Agatha.Common
 		public void AddResponseToReturn(string key, Response response)
 		{
 			_responsesToReturn.Add(response);
-			keyToResultPositions.Add(key, _responsesToReturn.Count - 1);
+			KeyToResultPositions.Add(key, _responsesToReturn.Count - 1);
 		}
 
 		public override void Clear()
@@ -68,9 +69,9 @@ namespace Agatha.Common
 			return SentRequests.Any(r => r.GetType() == typeof(TRequest));
 		}
 
-		protected override Response[] GetResponses(Request[] requestsToProcess)
+		protected override Task<Response[]> GetResponses(params Request[] requestsToProcess)
 		{
-			return _responsesToReturn.ToArray();
+			return Task.FromResult(_responsesToReturn.ToArray());
 		}
 	}
 }

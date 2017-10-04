@@ -1,6 +1,7 @@
 using System;
 using System.ServiceModel;
 using System.ServiceModel.Channels;
+using System.Threading.Tasks;
 
 namespace Agatha.Common.WCF
 {
@@ -26,19 +27,21 @@ namespace Agatha.Common.WCF
 
         public RequestProcessorProxy(InstanceContext callbackInstance, Binding binding, EndpointAddress remoteAddress) : base(callbackInstance, binding, remoteAddress) { }
 
+        public Task<Response[]> ProcessAsync(params Request[] requests)
+        {
+            return Channel.ProcessAsync(requests);
+        }
+
         public Response[] Process(params Request[] requests)
         {
-            return Channel.Process(requests);
+            return ProcessAsync(requests).GetAwaiter().GetResult();
         }
 
         public void Dispose()
         {
-            try
-            {
+            try {
                 Close();
-            }
-            catch (Exception)
-            {
+            } catch (Exception) {
                 Abort();
             }
         }

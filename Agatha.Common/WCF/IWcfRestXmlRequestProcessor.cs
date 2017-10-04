@@ -12,5 +12,11 @@ namespace Agatha.Common.WCF
         [TransactionFlow(TransactionFlowOption.Allowed)]
         [WebGet(UriTemplate="/", ResponseFormat = WebMessageFormat.Xml)]
         Response[] Process();
+
+        [OperationContract(Name = "ProcessXmlRequestsAsync")]
+        [ServiceKnownType("GetKnownTypes", typeof(KnownTypeProvider))]
+        [TransactionFlow(TransactionFlowOption.Allowed)]
+        [WebGet(UriTemplate="/", ResponseFormat = WebMessageFormat.Xml)]
+        Task<Response[]> ProcessAsync();
     }
 }

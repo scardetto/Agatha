@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Agatha.Common;
 using Agatha.Common.Interceptors;
 using Agatha.Common.InversionOfControl;
@@ -37,6 +38,11 @@ namespace Agatha.ServiceLayer
 
         public Response[] Process(params Request[] requests)
         {
+            return ProcessAsync(requests).GetAwaiter().GetResult();
+        }
+
+        public async Task<Response[]> ProcessAsync(params Request[] requests)
+        {
             if (requests == null) return null;
 
             var exceptionsPreviouslyOccurred = false;
@@ -65,7 +71,7 @@ namespace Agatha.ServiceLayer
                     }
 
                     if (!requestProcessingState.IsProcessed) {
-                        InvokeRequestHandler(requestProcessingState);
+                        await HandleRequest(requestProcessingState);
                     }
                 } catch (Exception exc) {
                     _logger.ErrorException(exc.Message, exc);
@@ -92,16 +98,11 @@ namespace Agatha.ServiceLayer
             return responses;
         }
 
-        private void InvokeRequestHandler(RequestProcessingContext requestProcessingState)
-        {
-            HandleRequest(requestProcessingState);
-        }
-
-        private void HandleRequest(RequestProcessingContext requestProcessingState)
+        private async Task HandleRequest(RequestProcessingContext requestProcessingState)
         {
             var request = requestProcessingState.Request;
             var handler = (IRequestHandler) _container.Resolve(GetRequestHandlerTypeFor(request));
-            var response = GetResponseFromHandler(request, handler);
+            var response = await GetResponseFromHandler(request, handler);
             requestProcessingState.MarkAsProcessed(response);
         }
 
@@ -132,11 +133,10 @@ namespace Agatha.ServiceLayer
             return typeof(IRequestHandler<>).MakeGenericType(request.GetType());
         }
 
-        private Response GetResponseFromHandler(Request request, IRequestHandler handler)
+        private Task<Response> GetResponseFromHandler(Request request, IRequestHandler handler)
         {
             try {
-                var response = handler.Handle(request);
-                return response;
+                return handler.Handle(request);
             } catch (Exception e) {
                 OnHandlerException(request, e);
                 throw;

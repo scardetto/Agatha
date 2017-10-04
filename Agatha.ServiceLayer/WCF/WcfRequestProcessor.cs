@@ -4,6 +4,7 @@ using Agatha.Common;
 using Agatha.Common.InversionOfControl;
 using Agatha.Common.WCF;
 using System.ServiceModel.Web;
+using System.Threading.Tasks;
 using Agatha.ServiceLayer.WCF.Rest;
 
 namespace Agatha.ServiceLayer.WCF
@@ -17,13 +18,26 @@ namespace Agatha.ServiceLayer.WCF
         [TransactionFlow(TransactionFlowOption.Allowed)]
         public Response[] Process(params Request[] requests)
         {
+            return ProcessAsync(requests).GetAwaiter().GetResult();
+        }
+
+        [TransactionFlow(TransactionFlowOption.Allowed)]
+        public Response[] Process()
+        {
+            return ProcessAsync().GetAwaiter().GetResult();
+        }
+
+        [TransactionFlow(TransactionFlowOption.Allowed)]
+        public async Task<Response[]> ProcessAsync(params Request[] requests)
+        {
             using (var container = GetContainer()) {
                 var processor = container.Resolve<IRequestProcessor>();
-                return processor.Process(requests);
+                return await processor.ProcessAsync(requests);
             }
         }
 
-        public Response[] Process()
+        [TransactionFlow(TransactionFlowOption.Allowed)]
+        public Task<Response[]> ProcessAsync()
         {
             var collection = WebOperationContext.Current?.IncomingRequest.UriTemplateMatch.QueryParameters;
 
@@ -31,7 +45,7 @@ namespace Agatha.ServiceLayer.WCF
 
             var requests = builder.GetRequests(collection);
 
-            return Process(requests);
+            return ProcessAsync(requests);
         }
 
         private IContainer GetContainer()
