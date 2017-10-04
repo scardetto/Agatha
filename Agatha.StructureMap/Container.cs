@@ -5,20 +5,20 @@ using sm = StructureMap;
 
 namespace Agatha.StructureMap
 {
-    public class Container : Agatha.Common.InversionOfControl.IContainer
+    public class Container : IContainer
     {
-        private readonly sm.IContainer _structureMapContainer;
+        private readonly sm.IContainer _container;
 
         public Container() : this(new sm.Container()) { }
 
-        public Container(sm.IContainer structureMapContainer)
+        public Container(sm.IContainer container)
         {
-            _structureMapContainer = structureMapContainer;
+            _container = container;
         }
 
         public void Register(Type componentType, Type implementationType, Lifestyle lifeStyle)
         {
-            _structureMapContainer.Configure(x => {
+            _container.Configure(x => {
                 if (lifeStyle == Lifestyle.Singleton) {
                     x.ForSingletonOf(componentType).Use(implementationType);
                 } else {
@@ -31,14 +31,12 @@ namespace Agatha.StructureMap
 
         private void OverrideConstructorResolvingWhenUsingRequestProcessorProxy(Type implementationType)
         {
-            if (implementationType == typeof(RequestProcessorProxy))
-            {
-                _structureMapContainer.Configure(x => x.ForConcreteType<RequestProcessorProxy>().Configure.SelectConstructor(() => new RequestProcessorProxy()));
+            if (implementationType == typeof(RequestProcessorProxy)) {
+                _container.Configure(x => x.ForConcreteType<RequestProcessorProxy>().Configure.SelectConstructor(() => new RequestProcessorProxy()));
             }
 
-            if (implementationType == typeof(AsyncRequestProcessorProxy))
-            {
-                _structureMapContainer.Configure(x => x.ForConcreteType<AsyncRequestProcessorProxy>().Configure.SelectConstructor(() => new AsyncRequestProcessorProxy()));
+            if (implementationType == typeof(AsyncRequestProcessorProxy)) {
+                _container.Configure(x => x.ForConcreteType<AsyncRequestProcessorProxy>().Configure.SelectConstructor(() => new AsyncRequestProcessorProxy()));
             }
         }
 
@@ -49,39 +47,42 @@ namespace Agatha.StructureMap
 
         public void RegisterInstance(Type componentType, object instance)
         {
-            _structureMapContainer.Configure(x => x.For(componentType).Use(instance));
+            _container.Configure(x => x.For(componentType).Use(instance));
         }
 
         public void RegisterInstance<TComponent>(TComponent instance) where TComponent : class
         {
-            _structureMapContainer.Configure(x => x.For<TComponent>().Use(instance));
+            _container.Configure(x => x.For<TComponent>().Use(instance));
         }
 
         public TComponent Resolve<TComponent>()
         {
-            return _structureMapContainer.GetInstance<TComponent>();
+            return _container.GetInstance<TComponent>();
         }
 
         public TComponent Resolve<TComponent>(string key)
         {
-            return _structureMapContainer.GetInstance<TComponent>(key);
+            return _container.GetInstance<TComponent>(key);
         }
 
         public object Resolve(Type componentType)
         {
-            return _structureMapContainer.GetInstance(componentType);
+            return _container.GetInstance(componentType);
         }
 
         public TComponent TryResolve<TComponent>()
         {
-            return _structureMapContainer.TryGetInstance<TComponent>();
+            return _container.TryGetInstance<TComponent>();
         }
 
-        public void Release(object component)
+        public IContainer GetChildContainer()
         {
-            // NOTE: i think this needs to be a no-op in the case of structuremap... the code below was in the original patch but
-            // i don't think its equivalent to Windsor's Release
-            //structureMapContainer.Model.EjectAndRemove(component.GetType());
+            return new Container(_container.CreateChildContainer());
+        }
+
+        public void Dispose()
+        {
+            _container.Dispose();
         }
     }
 }

@@ -4,7 +4,7 @@ namespace Agatha.Common
 {
     public class RequestProcessingContext
     {
-        public Request Request { get; private set; }
+        public Request Request { get; }
         public Response Response { get; private set; }
 
         public RequestProcessingContext(Request request)
@@ -14,8 +14,7 @@ namespace Agatha.Common
 
         public void MarkAsProcessed(Response response)
         {
-            if (response == null) throw new ArgumentNullException("response");
-            Response = response;
+            Response = response ?? throw new ArgumentNullException("response");
             IsProcessed = true;
         }
 

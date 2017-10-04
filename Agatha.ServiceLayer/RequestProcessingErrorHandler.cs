@@ -14,11 +14,13 @@ namespace Agatha.ServiceLayer
 
     public class RequestProcessingErrorHandler : IRequestProcessingErrorHandler
     {
-        private ServiceLayerConfiguration serviceLayerConfiguration;
+        private readonly IContainer _container;
+        private readonly ServiceLayerConfiguration _serviceLayerConfiguration;
 
-        public RequestProcessingErrorHandler(ServiceLayerConfiguration serviceLayerConfiguration)
+        public RequestProcessingErrorHandler(IContainer container, ServiceLayerConfiguration serviceLayerConfiguration)
         {
-            this.serviceLayerConfiguration = serviceLayerConfiguration;
+            _container = container;
+            _serviceLayerConfiguration = serviceLayerConfiguration;
         }
 
         public void DealWithException(RequestProcessingContext context, Exception exception)
@@ -61,14 +63,14 @@ namespace Agatha.ServiceLayer
 
         private Type TryBasedOnConventions(RequestProcessingContext context)
         {
-            var conventions = IoC.Container.TryResolve<IConventions>();
-            if (conventions != null) return conventions.GetResponseTypeFor(context.Request);
-            return null;
+            var conventions = _container.TryResolve<IConventions>();
+
+            return conventions?.GetResponseTypeFor(context.Request);
         }
 
         private Type TryBasedOnCachedResponse(RequestProcessingContext context)
         {
-            var cacheManager = IoC.Container.Resolve<ICacheManager>();
+            var cacheManager = _container.Resolve<ICacheManager>();
             if (cacheManager.IsCachingEnabledFor(context.Request.GetType()))
             {
                 var response = cacheManager.GetCachedResponseFor(context.Request);
@@ -79,22 +81,11 @@ namespace Agatha.ServiceLayer
 
         private Type TryBasedOnRequestHandler(RequestProcessingContext context)
         {
-            IRequestHandler handler = null;
-            try
-            {
-                handler = (IRequestHandler)IoC.Container.Resolve(GetRequestHandlerTypeFor(context.Request));
+            try {
+                var handler = (IRequestHandler)_container.Resolve(GetRequestHandlerTypeFor(context.Request));
                 return handler.CreateDefaultResponse().GetType();
-            }
-            catch
-            {
+            } catch {
                 return null;
-            }
-            finally
-            {
-                if (handler != null)
-                {
-                    IoC.Container.Release(handler);
-                }
             }
         }
 
@@ -107,7 +98,7 @@ namespace Agatha.ServiceLayer
         {
             var exceptionType = exception.GetType();
 
-            if (exceptionType.Equals(serviceLayerConfiguration.BusinessExceptionType))
+            if (exceptionType == _serviceLayerConfiguration.BusinessExceptionType)
             {
                 response.ExceptionType = ExceptionType.Business;
                 SetExceptionFaultCode(exception, response.Exception);
@@ -115,7 +106,7 @@ namespace Agatha.ServiceLayer
                 return;
             }
 
-            if (exceptionType.Equals(serviceLayerConfiguration.SecurityExceptionType))
+            if (exceptionType == _serviceLayerConfiguration.SecurityExceptionType)
             {
                 response.ExceptionType = ExceptionType.Security;
                 SetExceptionFaultCode(exception, response.Exception);
@@ -133,7 +124,7 @@ namespace Agatha.ServiceLayer
 
             if (faultCodeProperty != null
                 && faultCodeProperty.CanRead
-                && faultCodeProperty.PropertyType.Equals(typeof(string)))
+                && faultCodeProperty.PropertyType == typeof(string))
             {
                 exceptionInfo.FaultCode = (string)faultCodeProperty.GetValue(exception, null);
             }

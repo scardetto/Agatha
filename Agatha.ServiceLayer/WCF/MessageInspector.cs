@@ -11,13 +11,12 @@ namespace Agatha.ServiceLayer.WCF
 {
     public class MessageInspector : IDispatchMessageInspector
     {
-        private readonly ILog logger = LogProvider.GetLogger(typeof(MessageInspector));
-        private readonly ILog messageLogger = LogProvider.GetLogger("WCF.Messages");
+        private readonly ILog _logger = LogProvider.GetLogger(typeof(MessageInspector));
+        private readonly ILog _messageLogger = LogProvider.GetLogger("WCF.Messages");
 
         public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
         {
-            if (logger.IsInfoEnabled())
-            {
+            if (_logger.IsInfoEnabled()) {
                 var bufferedCopy = request.CreateBufferedCopy(int.MaxValue);
 
                 LogMessage("request", bufferedCopy.CreateMessage());
@@ -30,7 +29,7 @@ namespace Agatha.ServiceLayer.WCF
 
         public void BeforeSendReply(ref Message reply, object correlationState)
         {
-            if (logger.IsInfoEnabled() && reply != null)
+            if (_logger.IsInfoEnabled() && reply != null)
             {
                 var bufferedCopy = reply.CreateBufferedCopy(int.MaxValue);
 
@@ -51,15 +50,15 @@ namespace Agatha.ServiceLayer.WCF
                     message.WriteMessage(writer);
                     writer.Flush();
                     var size = Math.Round(memoryStream.Position/1024d, 2);
-                    logger.InfoFormat("{0} message size: ~{1} KB", messageType, size);
+                    _logger.InfoFormat("{0} message size: ~{1} KB", messageType, size);
                 }
 
-                if (messageLogger.IsDebugEnabled())
+                if (_messageLogger.IsDebugEnabled())
                 {
                     memoryStream.Position = 0;
                     using (var reader = new StreamReader(memoryStream))
                     {
-                        messageLogger.Debug(reader.ReadToEnd());
+                        _messageLogger.Debug(reader.ReadToEnd());
                     }
                 }
             }

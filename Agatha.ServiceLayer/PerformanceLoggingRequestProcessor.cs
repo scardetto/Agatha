@@ -2,62 +2,61 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using Agatha.Common;
+using Agatha.Common.InversionOfControl;
 using Agatha.ServiceLayer.Logging;
 
 namespace Agatha.ServiceLayer
 {
-	public class PerformanceLoggingRequestProcessor : RequestProcessor
-	{
-		public PerformanceLoggingRequestProcessor(ServiceLayerConfiguration serviceLayerConfiguration, IRequestProcessingErrorHandler errorHandler) : base(serviceLayerConfiguration, errorHandler) {}
+    public class PerformanceLoggingRequestProcessor : RequestProcessor
+    {
+        public PerformanceLoggingRequestProcessor(IContainer container, ServiceLayerConfiguration serviceLayerConfiguration, IRequestProcessingErrorHandler errorHandler)
+            : base(container, serviceLayerConfiguration, errorHandler) {}
 
-		private readonly ILog performanceLogger = LogProvider.GetLogger("AgathaPerformance");
+        private readonly ILog _performanceLogger = LogProvider.GetLogger("AgathaPerformance");
 
-		private Stopwatch requestStopwatch;
-		private Stopwatch batchStopwatch;
+        private Stopwatch _requestStopwatch;
+        private Stopwatch _batchStopwatch;
 
-		protected override void BeforeProcessing(IEnumerable<Request> requests)
-		{
-			base.BeforeProcessing(requests);
-			batchStopwatch = Stopwatch.StartNew();
-		}
+        protected override void BeforeProcessing(IEnumerable<Request> requests)
+        {
+            base.BeforeProcessing(requests);
+            _batchStopwatch = Stopwatch.StartNew();
+        }
 
-		protected override void AfterProcessing(IEnumerable<Request> requests, IEnumerable<Response> responses)
-		{
-			base.AfterProcessing(requests, responses);
-			batchStopwatch.Stop();
+        protected override void AfterProcessing(IEnumerable<Request> requests, IEnumerable<Response> responses)
+        {
+            base.AfterProcessing(requests, responses);
+            _batchStopwatch.Stop();
 
-			// TODO: make the 200ms limit configurable
-			if (batchStopwatch.ElapsedMilliseconds > 200)
-			{
-				var builder = new StringBuilder();
+            // TODO: make the 200ms limit configurable
+            if (_batchStopwatch.ElapsedMilliseconds > 200) {
+                var builder = new StringBuilder();
 
-				foreach (var request in requests)
-				{
-					builder.Append(request.GetType().Name + ", ");
-				}
+                foreach (var request in requests) {
+                    builder.Append(request.GetType().Name + ", ");
+                }
 
-				builder.Remove(builder.Length - 2, 2);
+                builder.Remove(builder.Length - 2, 2);
 
-				performanceLogger.Warn(string.Format("Performance warning: {0}ms for the following batch: {1}", batchStopwatch.ElapsedMilliseconds, builder));
-			}
-		}
+                _performanceLogger.Warn($"Performance warning: {_batchStopwatch.ElapsedMilliseconds}ms for the following batch: {builder}");
+            }
+        }
 
-		protected override void BeforeHandle(Request request)
-		{
-			base.BeforeHandle(request);
-			requestStopwatch = Stopwatch.StartNew();
-		}
+        protected override void BeforeHandle(Request request)
+        {
+            base.BeforeHandle(request);
+            _requestStopwatch = Stopwatch.StartNew();
+        }
 
-		protected override void AfterHandle(Request request)
-		{
-			base.AfterHandle(request);
-			requestStopwatch.Stop();
+        protected override void AfterHandle(Request request)
+        {
+            base.AfterHandle(request);
+            _requestStopwatch.Stop();
 
-			// TODO: make the 100ms limit configurable
-			if (requestStopwatch.ElapsedMilliseconds > 100)
-			{
-				performanceLogger.Warn(string.Format("Performance warning: {0}ms for {1}", requestStopwatch.ElapsedMilliseconds, request.GetType().Name));
-			}
-		}
-	}
+            // TODO: make the 100ms limit configurable
+            if (_requestStopwatch.ElapsedMilliseconds > 100)             {
+                _performanceLogger.Warn($"Performance warning: {_requestStopwatch.ElapsedMilliseconds}ms for {request.GetType().Name}");
+            }
+        }
+    }
 }

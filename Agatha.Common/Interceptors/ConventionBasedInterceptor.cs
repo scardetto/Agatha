@@ -7,11 +7,12 @@ namespace Agatha.Common.Interceptors
     {
         public abstract void BeforeHandlingRequest(RequestProcessingContext context);
         public abstract void AfterHandlingRequest(RequestProcessingContext context);
+
         protected IConventions Conventions { get; private set; }
 
-        protected ConventionBasedInterceptor()
+        protected ConventionBasedInterceptor(IContainer container)
         {
-            Conventions = IoC.Container.Resolve<IConventions>();
+            Conventions = container.Resolve<IConventions>();
         }
 
         public Response CreateDefaultResponseFor(Request request)

@@ -4,120 +4,116 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using Agatha.Common.Caching;
-using Agatha.Common.InversionOfControl;
 
 namespace Agatha.Common
 {
-	/// <summary>
-	/// Do not use this type directly, use it via an IAsyncRequestDispatcherFactory
-	/// </summary>
-	public interface IAsyncRequestDispatcher : IDisposable
-	{
-		void Add(Request request);
-		void Add<TRequest>(Action<TRequest> action) where TRequest : Request, new();
-		void Add(params Request[] requestsToAdd);
-		void Add(string key, Request request);
-		void Add(params OneWayRequest[] oneWayRequests);
-		void ProcessOneWayRequests();
-		void ProcessRequests(Action<ReceivedResponses> receivedResponsesDelegate, Action<ExceptionInfo> exceptionOccurredDelegate);
-		void ProcessRequests(Action<ReceivedResponses> receivedResponsesDelegate, Action<ExceptionInfo, ExceptionType> exceptionAndTypeOccurredDelegate);
-	}
+    /// <summary>
+    /// Do not use this type directly, use it via an IAsyncRequestDispatcherFactory
+    /// </summary>
+    public interface IAsyncRequestDispatcher : IDisposable
+    {
+        void Add(Request request);
+        void Add<TRequest>(Action<TRequest> action) where TRequest : Request, new();
+        void Add(params Request[] requestsToAdd);
+        void Add(string key, Request request);
+        void Add(params OneWayRequest[] oneWayRequests);
+        void ProcessOneWayRequests();
+        void ProcessRequests(Action<ReceivedResponses> receivedResponsesDelegate, Action<ExceptionInfo> exceptionOccurredDelegate);
+        void ProcessRequests(Action<ReceivedResponses> receivedResponsesDelegate, Action<ExceptionInfo, ExceptionType> exceptionAndTypeOccurredDelegate);
+    }
 
-	// TODO: make sure that OneWayRequests can't be added through the Add methods
+    // TODO: make sure that OneWayRequests can't be added through the Add methods
 
-	public class AsyncRequestDispatcher : Disposable, IAsyncRequestDispatcher
-	{
-		private readonly IAsyncRequestProcessor requestProcessor;
-	    private readonly ICacheManager cacheManager;
-	    protected Dictionary<string, int> keyToResultPositions;
-		private Dictionary<string, Type> keyToTypes;
+    public class AsyncRequestDispatcher : Disposable, IAsyncRequestDispatcher
+    {
+        private readonly IAsyncRequestProcessor _requestProcessor;
+        private readonly ICacheManager _cacheManager;
+        protected Dictionary<string, int> KeyToResultPositions;
+        private Dictionary<string, Type> _keyToTypes;
 
-		private bool oneWayRequestsAdded;
-		private bool twoWayRequestsAdded;
+        private bool _oneWayRequestsAdded;
+        private bool _twoWayRequestsAdded;
 
-		private List<Request> queuedRequests;
-		private List<OneWayRequest> queuedOneWayRequests;
+        private List<Request> _queuedRequests;
+        private List<OneWayRequest> _queuedOneWayRequests;
 
-		public AsyncRequestDispatcher(IAsyncRequestProcessor requestProcessor, ICacheManager cacheManager)
-		{
-			this.requestProcessor = requestProcessor;
-		    this.cacheManager = cacheManager;
-		    InitializeState();
-		}
+        public AsyncRequestDispatcher(IAsyncRequestProcessor requestProcessor, ICacheManager cacheManager)
+        {
+            _requestProcessor = requestProcessor;
+            _cacheManager = cacheManager;
+            InitializeState();
+        }
 
-		public virtual Request[] QueuedRequests
-		{
-			get { return queuedRequests.ToArray(); }
-		}
+        public virtual Request[] QueuedRequests => _queuedRequests.ToArray();
 
-		public virtual void Add(params Request[] requestsToAdd)
-		{
-			foreach (var request in requestsToAdd)
-			{
-				Add(request);
-			}
-		}
+        public virtual void Add(params Request[] requestsToAdd)
+        {
+            foreach (var request in requestsToAdd)
+            {
+                Add(request);
+            }
+        }
 
-		public virtual void Add(string key, Request request)
-		{
-			AddRequest(request, true);
-			keyToTypes[key] = request.GetType();
-			keyToResultPositions[key] = queuedRequests.Count - 1;
-		}
+        public virtual void Add(string key, Request request)
+        {
+            AddRequest(request, true);
+            _keyToTypes[key] = request.GetType();
+            KeyToResultPositions[key] = _queuedRequests.Count - 1;
+        }
 
-		public virtual void Add<TRequest>(Action<TRequest> action) where TRequest : Request, new()
-		{
-			var request = new TRequest();
-			action(request);
-			Add(request);
-		}
+        public virtual void Add<TRequest>(Action<TRequest> action) where TRequest : Request, new()
+        {
+            var request = new TRequest();
+            action(request);
+            Add(request);
+        }
 
-		public virtual void Add(Request request)
-		{
-			AddRequest(request, false);
-		}
+        public virtual void Add(Request request)
+        {
+            AddRequest(request, false);
+        }
 
-		public virtual void Add(params OneWayRequest[] oneWayRequests)
-		{
-			EnsureWeOnlyHaveOneWayRequests();
-			queuedOneWayRequests.AddRange(oneWayRequests);
-		}
+        public virtual void Add(params OneWayRequest[] oneWayRequests)
+        {
+            EnsureWeOnlyHaveOneWayRequests();
+            _queuedOneWayRequests.AddRange(oneWayRequests);
+        }
 
-		public virtual void ProcessOneWayRequests()
-		{
-			var requests = queuedOneWayRequests.ToArray();
-			BeforeSendingRequests(requests);
-			requestProcessor.ProcessOneWayRequestsAsync(requests, OnProcessOneWayRequestsCompleted);
-			AfterSendingRequests(requests);
-			queuedOneWayRequests.Clear();
-		}
+        public virtual void ProcessOneWayRequests()
+        {
+            var requests = _queuedOneWayRequests.ToArray();
+            BeforeSendingRequests(requests);
+            _requestProcessor.ProcessOneWayRequestsAsync(requests, OnProcessOneWayRequestsCompleted);
+            AfterSendingRequests(requests);
+            _queuedOneWayRequests.Clear();
+        }
 
-		private void OnProcessOneWayRequestsCompleted(AsyncCompletedEventArgs args)
-		{
-			Dispose();
+        private void OnProcessOneWayRequestsCompleted(AsyncCompletedEventArgs args)
+        {
+            Dispose();
 
-			if (args.Error != null)
-			{
-				throw new InvalidOperationException("Exception occurred during processing of one-way requests", args.Error);
-			}
-		}
+            if (args.Error != null)
+            {
+                throw new InvalidOperationException("Exception occurred during processing of one-way requests", args.Error);
+            }
+        }
 
-		public virtual void ProcessRequests(Action<ReceivedResponses> receivedResponsesDelegate, Action<ExceptionInfo> exceptionOccurredDelegate)
-		{
-			ProcessRequests(new ResponseReceiver(receivedResponsesDelegate, exceptionOccurredDelegate, keyToResultPositions, cacheManager));
-		}
+        public virtual void ProcessRequests(Action<ReceivedResponses> receivedResponsesDelegate, Action<ExceptionInfo> exceptionOccurredDelegate)
+        {
+            ProcessRequests(new ResponseReceiver(receivedResponsesDelegate, exceptionOccurredDelegate, KeyToResultPositions, _cacheManager));
+        }
 
-		public virtual void ProcessRequests(Action<ReceivedResponses> receivedResponsesDelegate, Action<ExceptionInfo, ExceptionType> exceptionAndTypeOccurredDelegate)
-		{
-			ProcessRequests(new ResponseReceiver(receivedResponsesDelegate, exceptionAndTypeOccurredDelegate, keyToResultPositions, cacheManager));
-		}
+        public virtual void ProcessRequests(Action<ReceivedResponses> receivedResponsesDelegate, Action<ExceptionInfo, ExceptionType> exceptionAndTypeOccurredDelegate)
+        {
+            ProcessRequests(new ResponseReceiver(receivedResponsesDelegate, exceptionAndTypeOccurredDelegate, KeyToResultPositions, _cacheManager));
+        }
 
-		private void ProcessRequests(ResponseReceiver responseReciever)
-		{
-            var requestsToProcess = queuedRequests.ToArray();
-            
+        private void ProcessRequests(ResponseReceiver responseReciever)
+        {
+            var requestsToProcess = _queuedRequests.ToArray();
+
             BeforeSendingRequests(requestsToProcess);
-            
+
             var tempResponseArray = new Response[requestsToProcess.Length];
             var requestsToSend = new List<Request>(requestsToProcess);
 
@@ -126,7 +122,7 @@ namespace Agatha.Common
 
             if (requestsToSendAsArray.Length > 0)
             {
-                requestProcessor.ProcessRequestsAsync(requestsToSendAsArray, 
+                _requestProcessor.ProcessRequestsAsync(requestsToSendAsArray,
                     a => OnProcessRequestsCompleted(a, responseReciever, tempResponseArray, requestsToSendAsArray));
             }
             else
@@ -134,9 +130,9 @@ namespace Agatha.Common
                 var synchronizationContext = SynchronizationContext.Current ?? new SynchronizationContext();
                 synchronizationContext.Post(s => OnProcessRequestsCompleted(null, responseReciever, tempResponseArray, requestsToSendAsArray), null);
             }
-            
+
             AfterSendingRequests(requestsToProcess);
-		}
+        }
 
         private void GetCachedResponsesAndRemoveThoseRequests(Request[] requestsToProcess, Response[] tempResponseArray, List<Request> requestsToSend)
         {
@@ -144,9 +140,9 @@ namespace Agatha.Common
             {
                 var request = requestsToProcess[i];
 
-                if (cacheManager.IsCachingEnabledFor(request.GetType()))
+                if (_cacheManager.IsCachingEnabledFor(request.GetType()))
                 {
-                    var cachedResponse = cacheManager.GetCachedResponseFor(request);
+                    var cachedResponse = _cacheManager.GetCachedResponseFor(request);
 
                     if (cachedResponse != null)
                     {
@@ -157,86 +153,79 @@ namespace Agatha.Common
             }
         }
 
-		protected virtual void BeforeSendingRequests(IEnumerable<Request> requestsToProcess) {}
-		protected virtual void AfterSendingRequests(IEnumerable<Request> sentRequests) {}
+        protected virtual void BeforeSendingRequests(IEnumerable<Request> requestsToProcess) {}
+        protected virtual void AfterSendingRequests(IEnumerable<Request> sentRequests) {}
 
-		public virtual void OnProcessRequestsCompleted(ProcessRequestsAsyncCompletedArgs args, ResponseReceiver responseReciever, 
+        public virtual void OnProcessRequestsCompleted(ProcessRequestsAsyncCompletedArgs args, ResponseReceiver responseReciever,
             Response[] tempResponseArray, Request[] requestsToSendAsArray)
-		{
-			Dispose();
-			responseReciever.ReceiveResponses(args, tempResponseArray, requestsToSendAsArray);
-		}
+        {
+            Dispose();
+            responseReciever.ReceiveResponses(args, tempResponseArray, requestsToSendAsArray);
+        }
 
-		protected override void DisposeManagedResources()
-		{
-			// WHY: this is really only important for containers that require explicit release of disposable components (Castle)... if
-			// people use the AsyncRequestDispatcherFactory to create instances of this class in combination with Castle Windsor, these
-			// instances need to be released explicitly because they have been resolved through the container
-			if (IoC.Container != null)
-			{
-				IoC.Container.Release(this);
-			}
+        protected override void DisposeManagedResources()
+        {
+            _requestProcessor?.Dispose();
+        }
 
-			if (requestProcessor != null) requestProcessor.Dispose();
-		}
+        private void AddRequest(Request request, bool wasAddedWithKey)
+        {
+            EnsureWeOnlyHaveTwoWayRequests();
 
-		private void AddRequest(Request request, bool wasAddedWithKey)
-		{
-			EnsureWeOnlyHaveTwoWayRequests();
-			
-			Type requestType = request.GetType();
+            Type requestType = request.GetType();
 
-			if (RequestTypeIsAlreadyPresent(requestType) &&
-				(RequestTypeIsNotAssociatedWithKey(requestType) || !wasAddedWithKey))
-			{
-				throw new InvalidOperationException(String.Format("A request of type {0} has already been added. "
-																  + "Please add requests of the same type with a different key.", requestType.FullName));
-			}
+            if (RequestTypeIsAlreadyPresent(requestType) &&
+                (RequestTypeIsNotAssociatedWithKey(requestType) || !wasAddedWithKey))
+            {
+                throw new InvalidOperationException(
+                    $"A request of type {requestType.FullName} has already been added. " +
+                    "Please add requests of the same type with a different key.");
+            }
 
-			queuedRequests.Add(request);
-		}
+            _queuedRequests.Add(request);
+        }
 
-		private bool RequestTypeIsAlreadyPresent(Type requestType)
-		{
-			return QueuedRequests.Any(r => r.GetType().Equals(requestType));
-		}
+        private bool RequestTypeIsAlreadyPresent(Type requestType)
+        {
+            return QueuedRequests.Any(r => r.GetType().Equals(requestType));
+        }
 
-		private bool RequestTypeIsNotAssociatedWithKey(Type requestType)
-		{
-			return !keyToTypes.Values.Contains(requestType);
-		}
+        private bool RequestTypeIsNotAssociatedWithKey(Type requestType)
+        {
+            return !_keyToTypes.Values.Contains(requestType);
+        }
 
-		private void InitializeState()
-		{
-			queuedRequests = new List<Request>();
-			queuedOneWayRequests = new List<OneWayRequest>();
-			keyToTypes = new Dictionary<string, Type>();
-			keyToResultPositions = new Dictionary<string, int>();
-		}
+        private void InitializeState()
+        {
+            _queuedRequests = new List<Request>();
+            _queuedOneWayRequests = new List<OneWayRequest>();
+            _keyToTypes = new Dictionary<string, Type>();
+            KeyToResultPositions = new Dictionary<string, int>();
+        }
 
-		private void EnsureWeOnlyHaveOneWayRequests()
-		{
-			if (twoWayRequestsAdded)
-			{
-				ThrowInvalidUsageException();
-			}
+        private void EnsureWeOnlyHaveOneWayRequests()
+        {
+            if (_twoWayRequestsAdded)
+            {
+                ThrowInvalidUsageException();
+            }
 
-			oneWayRequestsAdded = true;
-		}
+            _oneWayRequestsAdded = true;
+        }
 
-		private void EnsureWeOnlyHaveTwoWayRequests()
-		{
-			if (oneWayRequestsAdded)
-			{
-				ThrowInvalidUsageException();
-			}
+        private void EnsureWeOnlyHaveTwoWayRequests()
+        {
+            if (_oneWayRequestsAdded)
+            {
+                ThrowInvalidUsageException();
+            }
 
-			twoWayRequestsAdded = true;
-		}
+            _twoWayRequestsAdded = true;
+        }
 
-		private void ThrowInvalidUsageException()
-		{
-			throw new InvalidOperationException("You cannot combine one-way and two-way requests in the same AsyncRequestDispatcher.");
-		}
-	}
+        private void ThrowInvalidUsageException()
+        {
+            throw new InvalidOperationException("You cannot combine one-way and two-way requests in the same AsyncRequestDispatcher.");
+        }
+    }
 }
