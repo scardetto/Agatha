@@ -18,8 +18,6 @@ namespace Agatha.Common
 		public Type RequestDispatcherFactoryImplementation { get; set; }
 		public Type RequestProcessorImplementation { get; set; }
 		public Type AsyncRequestDispatcherImplementation { get; set; }
-		public Type AsyncRequestDispatcherFactoryImplementation { get; set; }
-		public Type AsyncRequestProcessorImplementation { get; set; }
 		public Type ContainerImplementation { get; }
 		public Type CacheProviderImplementation { get; set; }
 		public Type CacheManagerImplementation { get; set; }
@@ -56,6 +54,7 @@ namespace Agatha.Common
 
 		private void SetDefaultImplementations()
 		{
+			AsyncRequestDispatcherImplementation = typeof(AsyncRequestDispatcher);
 			RequestDispatcherImplementation = typeof(RequestDispatcher);
 			RequestDispatcherFactoryImplementation = typeof(RequestDispatcherFactory);
 			RequestProcessorImplementation = typeof(RequestProcessorProxy);
@@ -72,6 +71,7 @@ namespace Agatha.Common
 
 			IoC.Container.Register(typeof(IRequestProcessor), RequestProcessorImplementation, Lifestyle.Transient);
 			IoC.Container.Register(typeof(IRequestDispatcher), RequestDispatcherImplementation, Lifestyle.Transient);
+			IoC.Container.Register(typeof(IAsyncRequestDispatcher), AsyncRequestDispatcherImplementation, Lifestyle.Transient);
 			IoC.Container.Register(typeof(IRequestDispatcherFactory), RequestDispatcherFactoryImplementation, Lifestyle.Singleton);
 			IoC.Container.Register(typeof(ICacheProvider), CacheProviderImplementation, Lifestyle.Singleton);
 			IoC.Container.Register(typeof(ICacheManager), CacheManagerImplementation, Lifestyle.Singleton);

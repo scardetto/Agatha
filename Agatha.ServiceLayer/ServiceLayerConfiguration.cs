@@ -19,7 +19,6 @@ namespace Agatha.ServiceLayer
         private readonly List<Type> _registeredInterceptors = new List<Type>();
 
         public Type RequestProcessorImplementation { get; set; }
-        public Type AsyncRequestProcessorImplementation { get; set; }
         public Type CacheManagerImplementation { get; set; }
         public Type CacheProviderImplementation { get; set; }
         public Type ContainerImplementation { get; }

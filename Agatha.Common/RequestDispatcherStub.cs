@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace Agatha.Common
 {
@@ -69,9 +68,9 @@ namespace Agatha.Common
 			return SentRequests.Any(r => r.GetType() == typeof(TRequest));
 		}
 
-		protected override Task<Response[]> GetResponses(params Request[] requestsToProcess)
+		protected override Response[] GetResponses(params Request[] requestsToProcess)
 		{
-			return Task.FromResult(_responsesToReturn.ToArray());
+		    return _responsesToReturn.ToArray();
 		}
 	}
 }

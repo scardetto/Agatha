@@ -111,6 +111,7 @@
     <Compile Include="OneWayRequest.cs" />
     <Compile Include="ProcessRequestsAsyncCompletedArgs.cs" />
     <Compile Include="ReceivedResponses.cs" />
+    <Compile Include="AsyncRequestDispatcher.cs" />
     <Compile Include="RequestDispatcher.cs" />
     <Compile Include="RequestDispatcherFactory.cs" />
     <Compile Include="RequestDispatcherFactoryStub.cs" />

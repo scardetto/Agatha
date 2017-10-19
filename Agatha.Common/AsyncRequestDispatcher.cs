@@ -1,38 +1,40 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Agatha.Common.Caching;
 
 namespace Agatha.Common
 {
-    public interface IRequestDispatcher : IDisposable
+    public interface IAsyncRequestDispatcher : IDisposable
     {
-        IEnumerable<Response> Responses { get; }
-
         void Add(Request request);
         void Add(params Request[] requestsToAdd);
         void Add(string key, Request request);
         void Add<TRequest>(Action<TRequest> action) where TRequest : Request, new();
-        bool HasResponse<TResponse>() where TResponse : Response;
-        TResponse Get<TResponse>() where TResponse : Response;
-        TResponse Get<TResponse>(string key) where TResponse : Response;
-        TResponse Get<TResponse>(Request request) where TResponse : Response;
+
+        Task<IEnumerable<Response>> GetResponses();
+        Task<bool> HasResponse<TResponse>() where TResponse : Response;
+
+        Task<TResponse> GetAsync<TResponse>() where TResponse : Response;
+        Task<TResponse> GetAsync<TResponse>(string key) where TResponse : Response;
+        Task<TResponse> GetAsync<TResponse>(Request request) where TResponse : Response;
+
         void Clear();
     }
 
-    // TODO: make sure that OneWayRequests can't be added through the Add methods
-
-    public class RequestDispatcher : Disposable, IRequestDispatcher
+    public class AsyncRequestDispatcher : Disposable, IAsyncRequestDispatcher
     {
         private readonly IRequestProcessor _requestProcessor;
         private readonly ICacheManager _cacheManager;
 
         private Dictionary<string, Type> _keyToTypes;
-        protected Dictionary<string, int> KeyToResultPositions;
         private List<Request> _requests;
         private Response[] _responses;
 
-        public RequestDispatcher(IRequestProcessor requestProcessor, ICacheManager cacheManager)
+        protected Dictionary<string, int> KeyToResultPositions;
+
+        public AsyncRequestDispatcher(IRequestProcessor requestProcessor, ICacheManager cacheManager)
         {
             _requestProcessor = requestProcessor;
             _cacheManager = cacheManager;
@@ -49,13 +51,10 @@ namespace Agatha.Common
 
         public IEnumerable<Request> SentRequests => _requests;
 
-        public IEnumerable<Response> Responses
+        public async Task<IEnumerable<Response>> GetResponses()
         {
-            get
-            {
-                SendRequestsIfNecessary();
-                return _responses;
-            }
+            await SendRequestsIfNecessary();
+            return _responses;
         }
 
         public virtual void Add(params Request[] requestsToAdd)
@@ -80,42 +79,45 @@ namespace Agatha.Common
 
         public virtual void Add(string key, Request request)
         {
-            if (_keyToTypes.Keys.Contains(key))
+            if (_keyToTypes.Keys.Contains(key)) {
                 throw new InvalidOperationException(
                     $"A request has already been added using the key '{key}'.");
+            }
+
             _keyToTypes[key] = request.GetType();
             AddRequest(request, true);
             KeyToResultPositions[key] = _requests.Count - 1;
         }
 
-        public virtual bool HasResponse<TResponse>() where TResponse : Response
+        public virtual async Task<bool> HasResponse<TResponse>() where TResponse : Response
         {
-            SendRequestsIfNecessary();
+            await SendRequestsIfNecessary();
             return _responses.OfType<TResponse>().Any();
         }
 
-        private bool HasResponse(string key)
+        private async Task<bool> HasResponse(string key)
         {
-            SendRequestsIfNecessary();
+            await SendRequestsIfNecessary();
             return KeyToResultPositions.ContainsKey(key);
         }
 
-        private bool HasMoreThanOneResponse<TResponse>() where TResponse : Response
+        private async Task<bool> HasMoreThanOneResponse<TResponse>() where TResponse : Response
         {
-            SendRequestsIfNecessary();
+            await SendRequestsIfNecessary();
             return _responses.OfType<TResponse>().Count() > 1;
         }
 
-        public virtual TResponse Get<TResponse>() where TResponse : Response
+        public virtual async Task<TResponse> GetAsync<TResponse>() where TResponse : Response
         {
-            SendRequestsIfNecessary();
-            if (!HasResponse<TResponse>())
+            await SendRequestsIfNecessary();
+
+            if (!await HasResponse<TResponse>())
             {
                 throw new InvalidOperationException(
                     $"There is no response with type {typeof(TResponse).FullName}. Maybe you called Clear before or forgot to add appropriate request first.");
             }
 
-            if (HasMoreThanOneResponse<TResponse>())
+            if (await HasMoreThanOneResponse<TResponse>())
             {
                 throw new InvalidOperationException(
                     $"There is more than one response with type {typeof(TResponse).FullName}. If two request handlers return responses with the same type, you need to add requests using Add(string key, Request request).");
@@ -124,10 +126,10 @@ namespace Agatha.Common
             return _responses.OfType<TResponse>().Single();
         }
 
-        public virtual TResponse Get<TResponse>(string key) where TResponse : Response
+        public virtual async Task<TResponse> GetAsync<TResponse>(string key) where TResponse : Response
         {
-            SendRequestsIfNecessary();
-            if (!HasResponse(key))
+            await SendRequestsIfNecessary();
+            if (!await HasResponse(key))
             {
                 throw new InvalidOperationException(
                     $"There is no response with key '{key}'. Maybe you called Clear before or forgot to add appropriate request first.");
@@ -136,10 +138,25 @@ namespace Agatha.Common
             return (TResponse)_responses[KeyToResultPositions[key]];
         }
 
-        public virtual TResponse Get<TResponse>(Request request) where TResponse : Response
+        public virtual async Task<TResponse> GetAsync<TResponse>(Request request) where TResponse : Response
         {
             Add(request);
-            return Get<TResponse>();
+            return await GetAsync<TResponse>();
+        }
+
+        public TResponse Get<TResponse>() where TResponse : Response
+        {
+            return GetAsync<TResponse>().GetAwaiter().GetResult();
+        }
+
+        public TResponse Get<TResponse>(string key) where TResponse : Response
+        {
+            return GetAsync<TResponse>(key).GetAwaiter().GetResult();
+        }
+
+        public TResponse Get<TResponse>(Request request) where TResponse : Response
+        {
+            return GetAsync<TResponse>(request).GetAwaiter().GetResult();
         }
 
         public virtual void Clear()
@@ -152,7 +169,7 @@ namespace Agatha.Common
             _requestProcessor?.Dispose();
         }
 
-        protected virtual Response[] GetResponses(params Request[] requestsToProcess)
+        protected virtual async Task<Response[]> GetResponses(params Request[] requestsToProcess)
         {
             BeforeSendingRequests(requestsToProcess);
 
@@ -164,7 +181,7 @@ namespace Agatha.Common
 
             if (requestsToSend.Count > 0)
             {
-                var receivedResponses = _requestProcessor.Process(requestsToSendAsArray);
+                var receivedResponses = await _requestProcessor.ProcessAsync(requestsToSendAsArray);
                 AddCacheableResponsesToCache(receivedResponses, requestsToSendAsArray);
                 PutReceivedResponsesInTempResponseArray(tempResponseArray, receivedResponses);
             }
@@ -221,11 +238,10 @@ namespace Agatha.Common
         protected virtual void AfterSendingRequests(IEnumerable<Request> sentRequests) {}
         protected virtual void BeforeReturningResponses(IEnumerable<Response> receivedResponses) {}
 
-        private void SendRequestsIfNecessary()
+        private async Task SendRequestsIfNecessary()
         {
-            if (!RequestsSent())
-            {
-                _responses = GetResponses(_requests.ToArray());
+            if (!RequestsSent()) {
+                _responses = await GetResponses(_requests.ToArray());
                 DealWithPossibleExceptions(_responses);
             }
         }
@@ -257,12 +273,11 @@ namespace Agatha.Common
 
         private void AddRequest(Request request, bool wasAddedWithKey)
         {
-            if (RequestsSent())
-            {
+            if (RequestsSent()) {
                 throw new InvalidOperationException("Requests where already send. Either add request earlier or call Clear.");
             }
 
-            Type requestType = request.GetType();
+            var requestType = request.GetType();
 
             if (RequestTypeIsAlreadyPresent(requestType) &&
                 (RequestTypeIsNotAssociatedWithKey(requestType) || !wasAddedWithKey))

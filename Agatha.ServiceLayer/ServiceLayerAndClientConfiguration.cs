@@ -15,7 +15,6 @@ namespace Agatha.ServiceLayer
         private ServiceLayerConfiguration _serviceLayerConfiguration;
 
         public Type RequestProcessorImplementation { get; set; }
-        public Type AsyncRequestProcessorImplementation { get; set; }
         public Type CacheManagerImplementation { get; set; }
         public Type CacheProviderImplementation { get; set; }
         public Type ContainerImplementation { get; }
@@ -25,7 +24,6 @@ namespace Agatha.ServiceLayer
         public Type RequestDispatcherImplementation { get; set; }
         public Type RequestDispatcherFactoryImplementation { get; set; }
         public Type AsyncRequestDispatcherImplementation { get; set; }
-        public Type AsyncRequestDispatcherFactoryImplementation { get; set; }
 
         public ServiceLayerAndClientConfiguration(IContainer container)
         {
@@ -69,6 +67,7 @@ namespace Agatha.ServiceLayer
         {
             RequestDispatcherImplementation = typeof(RequestDispatcher);
             RequestDispatcherFactoryImplementation = typeof(RequestDispatcherFactory);
+            AsyncRequestDispatcherImplementation = typeof(AsyncRequestDispatcher);
             RequestProcessorImplementation = typeof(RequestProcessor);
             CacheManagerImplementation = typeof(CacheManager);
             CacheProviderImplementation = typeof(InMemoryCacheProvider);
@@ -79,22 +78,24 @@ namespace Agatha.ServiceLayer
 
         public void Initialize()
         {
-            _serviceLayerConfiguration.AsyncRequestProcessorImplementation = AsyncRequestProcessorImplementation;
             _serviceLayerConfiguration.BusinessExceptionType = BusinessExceptionType;
             _serviceLayerConfiguration.RequestProcessorImplementation = RequestProcessorImplementation;
             _serviceLayerConfiguration.SecurityExceptionType = SecurityExceptionType;
             _serviceLayerConfiguration.CacheManagerImplementation = CacheManagerImplementation;
             _serviceLayerConfiguration.CacheProviderImplementation = CacheProviderImplementation;
 
-            foreach (var assembly in _requestHandlerAssemblies)
+            foreach (var assembly in _requestHandlerAssemblies) {
                 _serviceLayerConfiguration.AddRequestHandlerAssembly(assembly);
+            }
 
-            foreach (var assembly in _requestsAndResponseAssemblies)
+            foreach (var assembly in _requestsAndResponseAssemblies) {
                 _serviceLayerConfiguration.AddRequestAndResponseAssembly(assembly);
+            }
 
             _serviceLayerConfiguration.Initialize();
 
             IoC.Container.Register(typeof(IRequestDispatcher), RequestDispatcherImplementation, Lifestyle.Transient);
+            IoC.Container.Register(typeof(IAsyncRequestDispatcher), AsyncRequestDispatcherImplementation, Lifestyle.Transient);
             IoC.Container.Register(typeof(IRequestDispatcherFactory), RequestDispatcherFactoryImplementation, Lifestyle.Singleton);
         }
 

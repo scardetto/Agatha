@@ -47,7 +47,7 @@ namespace Agatha.ServiceLayer
 
             var exceptionsPreviouslyOccurred = false;
 
-            var unitOfWork = _container.Resolve<IAgathaUnitOfWork>();
+            var unitOfWork = _container.TryResolve<IAgathaUnitOfWork>();
             if (unitOfWork != null) {
                 await unitOfWork.Start()
                     .ConfigureAwait(false);
