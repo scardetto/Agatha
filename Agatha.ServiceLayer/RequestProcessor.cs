@@ -48,6 +48,11 @@ namespace Agatha.ServiceLayer
             var exceptionsPreviouslyOccurred = false;
 
             var unitOfWork = _container.Resolve<IAgathaUnitOfWork>();
+            if (unitOfWork != null) {
+                await unitOfWork.Start()
+                    .ConfigureAwait(false);
+            }
+
             Exception initialException = null;
 
             var processingContexts = requests.Select(request => new RequestProcessingContext(request)).ToList();
@@ -73,11 +78,11 @@ namespace Agatha.ServiceLayer
                     if (!requestProcessingState.IsProcessed) {
                         await HandleRequest(requestProcessingState);
                     }
-                } catch (Exception exc) {
-                    _logger.ErrorException(exc.Message, exc);
+                } catch (Exception ex) {
+                    _logger.ErrorException(ex.Message, ex);
                     exceptionsPreviouslyOccurred = true;
-                    initialException = exc;
-                    _errorHandler.DealWithException(requestProcessingState, exc);
+                    initialException = ex;
+                    _errorHandler.DealWithException(requestProcessingState, ex);
                 } finally {
                     var possibleExceptionsFromInterceptors = RunInvokedInterceptorsSafely(requestProcessingState, invokedInterceptors);
 
@@ -92,10 +97,12 @@ namespace Agatha.ServiceLayer
                 }
             }
 
-            var responses = processingContexts.Select(c => c.Response).ToArray();
-            unitOfWork.End(initialException);
+            if (unitOfWork != null) {
+                await unitOfWork.End(initialException)
+                    .ConfigureAwait(false);
+            }
 
-            return responses;
+            return processingContexts.Select(c => c.Response).ToArray();
         }
 
         private async Task HandleRequest(RequestProcessingContext requestProcessingState)

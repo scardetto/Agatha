@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Agatha.Common;
 
@@ -19,11 +20,6 @@ namespace Agatha.ServiceLayer
     {
         public abstract Task<Response> Handle(Request request);
         public abstract Response CreateDefaultResponse();
-
-        /// <summary>
-        /// Default implementation is empty
-        /// </summary>
-        protected override void DisposeManagedResources() { }
     }
 
     public abstract class RequestHandler<TRequest, TResponse> : RequestHandler, IRequestHandler<TRequest>, ITypedRequestHandler
@@ -36,7 +32,10 @@ namespace Agatha.ServiceLayer
             return Handle(typedRequest);
         }
 
-        public abstract Task<Response> Handle(TRequest request);
+        public Task<Response> Handle(TRequest request)
+        {
+            return HandleAsync(request).AsTask<TResponse, Response>();
+        }
 
         public override Response CreateDefaultResponse()
         {
@@ -47,6 +46,10 @@ namespace Agatha.ServiceLayer
         {
             return new TResponse();
         }
+
+        protected override void DisposeManagedResources() { }
+
+        public abstract Task<TResponse> HandleAsync(TRequest request);
     }
 
     /// <summary>
@@ -54,5 +57,16 @@ namespace Agatha.ServiceLayer
     /// </summary>
     public interface ITypedRequestHandler
     {
+    }
+
+    public static class ResponseExtensions
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Task<TResult> AsTask<T, TResult>(this Task<T> task)
+            where T : TResult
+            where TResult : class
+        {
+            return task.ContinueWith(t => t.Result as TResult);
+        }
     }
 }

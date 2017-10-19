@@ -1,11 +1,12 @@
 ﻿using System;
+using System.Threading.Tasks;
 
 namespace Agatha.Common.Interceptors
 {
     public interface IAgathaUnitOfWork
     {
-        void Start();
+        Task Start();
 
-        void End(Exception ex = null);
+        Task End(Exception ex = null);
     }
 }

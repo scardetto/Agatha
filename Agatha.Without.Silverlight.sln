@@ -9,6 +9,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Agatha.ServiceLayer", "Agat
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Agatha.StructureMap", "Agatha.StructureMap\Agatha.StructureMap.csproj", "{4F975E3B-2BED-40D1-A8F5-D5FA7030CCAB}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{33F2EE48-DA42-46C1-8B93-B854FDA58BB0}"
+	ProjectSection(SolutionItems) = preProject
+		nuget\Agatha.Common\Agatha.Common.nuspec = nuget\Agatha.Common\Agatha.Common.nuspec
+		nuget\Agatha.ServiceLayer\Agatha.ServiceLayer.nuspec = nuget\Agatha.ServiceLayer\Agatha.ServiceLayer.nuspec
+		nuget\Agatha.StructureMap\Agatha.StructureMap.nuspec = nuget\Agatha.StructureMap\Agatha.StructureMap.nuspec
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

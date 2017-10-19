@@ -82,9 +82,11 @@ namespace Agatha.Common
 
         public virtual void Add(string key, Request request)
         {
-            if (_keyToTypes.Keys.Contains(key))
+            if (_keyToTypes.Keys.Contains(key)) {
                 throw new InvalidOperationException(
                     $"A request has already been added using the key '{key}'.");
+            }
+
             _keyToTypes[key] = request.GetType();
             AddRequest(request, true);
             KeyToResultPositions[key] = _requests.Count - 1;
@@ -241,8 +243,7 @@ namespace Agatha.Common
 
         private async Task SendRequestsIfNecessary()
         {
-            if (!RequestsSent())
-            {
+            if (!RequestsSent()) {
                 _responses = await GetResponses(_requests.ToArray());
                 DealWithPossibleExceptions(_responses);
             }
