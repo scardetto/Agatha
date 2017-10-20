@@ -34,7 +34,7 @@ namespace Agatha.Common.WCF
 
         public Response[] Process(params Request[] requests)
         {
-            return ProcessAsync(requests).GetAwaiter().GetResult();
+            return Channel.Process(requests);
         }
 
         public void Dispose()

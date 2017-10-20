@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>Agatha.StructureMap</id>
-    <version>2.0.5</version>
+    <version>2.0.7</version>
     <authors>Davy Brion</authors>
     <owners>davybrion</owners>
     <licenseUrl>http://www.apache.org/licenses/LICENSE-2.0</licenseUrl>
@@ -11,7 +11,7 @@
     <description>StructureMap container for Agatha</description>
     <dependencies>
       <dependency id="StructureMap" version="4.5.2" />
-      <dependency id="Agatha.Common" version="2.0.4" />
+      <dependency id="Agatha.Common" version="2.0.7" />
     </dependencies>
   </metadata>
 </package>

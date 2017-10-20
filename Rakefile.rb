@@ -1,6 +1,6 @@
 require 'albacore'
 
-version = "2.0.5"
+version = "2.0.7"
 build_configuration = "Release"
 feed = 'https://www.myget.org/F/is3inc/api/v2/package'
 api_key = 'bc95f2a2-bbc8-45ec-abad-304dd1c35fea'
@@ -17,7 +17,7 @@ task :package => [:copy] do
   sh 'nuget\\.nuget\\NuGet.exe pack nuget\\Agatha.StructureMap\\Agatha.StructureMap.nuspec -OutputDirectory nuget'
 end
 
-task :publish => [:copy] do
+task :publish => [:package] do
   sh "./nuget/.nuget/NuGet.exe push ./nuget/Agatha.Common.#{version}.nupkg #{api_key} -Source #{feed}"
   sh "./nuget/.nuget/NuGet.exe push ./nuget/Agatha.ServiceLayer.#{version}.nupkg #{api_key} -Source #{feed}"
   sh "./nuget/.nuget/NuGet.exe push ./nuget/Agatha.StructureMap.#{version}.nupkg #{api_key} -Source #{feed}"
